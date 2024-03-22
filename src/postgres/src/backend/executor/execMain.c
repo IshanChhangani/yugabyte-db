@@ -323,6 +323,13 @@ standard_ExecutorRun(QueryDesc *queryDesc,
 	 */
 	oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
 
+	if(!yb_session_stats.is_timing_pgss)
+	{
+		yb_session_stats.is_timing_pgss = true;
+		yb_session_stats.pgss_retry_time = 0;
+		INSTR_TIME_SET_CURRENT(yb_session_stats.pgss_start_time);
+	}
+
 	/* Allow instrumentation of Executor overall runtime */
 	if (queryDesc->totaltime)
 		InstrStartNode(queryDesc->totaltime);
@@ -375,7 +382,7 @@ standard_ExecutorRun(QueryDesc *queryDesc,
 		InstrStopNode(queryDesc->totaltime, estate->es_processed);
 
 	MemoryContextSwitchTo(oldcontext);
-	yb_session_stats.total_execution_time += INSTR_TIME_GET_DOUBLE(queryDesc->totaltime->counter);
+	// yb_session_stats.total_execution_time += INSTR_TIME_GET_DOUBLE(queryDesc->totaltime->counter);
 }
 
 /* ----------------------------------------------------------------
@@ -517,8 +524,10 @@ standard_ExecutorEnd(QueryDesc *queryDesc)
 	
 	yb_session_stats.total_execution_time = 0;
 	yb_session_stats.no_of_retries = 0;
-	yb_session_stats.explain_retry_time = 0;
+	// yb_session_stats.explain_retry_time = 0;
+	yb_session_stats.pgss_retry_time = 0;
 	yb_session_stats.is_timing = false;
+	yb_session_stats.is_timing_pgss = false;
 	yb_session_stats.exponential_backoff_time = 0;
 }
 

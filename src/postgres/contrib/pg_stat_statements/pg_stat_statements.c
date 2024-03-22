@@ -1341,6 +1341,16 @@ pgss_ExecutorFinish(QueryDesc *queryDesc)
 	}
 	PG_END_TRY();
 }
+static double
+elapsed_time(instr_time *starttime)
+{
+	instr_time	endtime;
+
+	INSTR_TIME_SET_CURRENT(endtime);
+	INSTR_TIME_SUBTRACT(endtime, *starttime);
+	return INSTR_TIME_GET_DOUBLE(endtime);
+}
+
 
 /*
  * ExecutorEnd hook: store results if needed
@@ -1357,12 +1367,13 @@ pgss_ExecutorEnd(QueryDesc *queryDesc)
 		 * levels of hook all do this.)
 		 */
 		InstrEndLoop(queryDesc->totaltime);
-
+		yb_session_stats.pgss_retry_time = elapsed_time(&yb_session_stats.pgss_start_time);
 		pgss_store(queryDesc->sourceText,
 				   queryId,
 				   queryDesc->plannedstmt->stmt_location,
 				   queryDesc->plannedstmt->stmt_len,
-				   (yb_session_stats.exponential_backoff_time + yb_session_stats.total_execution_time) * 1000.0,
+				//    (yb_session_stats.exponential_backoff_time + yb_session_stats.total_execution_time) * 1000.0,
+				yb_session_stats.pgss_retry_time * 1000.0,
 				   queryDesc->estate->es_processed,
 				   &queryDesc->totaltime->bufusage,
 				   NULL);
@@ -1411,8 +1422,8 @@ pgss_ProcessUtility(PlannedStmt *pstmt, const char *queryString,
 					bufusage;
 
 		bufusage_start = pgBufferUsage;
+		yb_session_stats.explain_retry_time = 0;
 		INSTR_TIME_SET_CURRENT(start);
-
 		nested_level++;
 		PG_TRY();
 		{
@@ -1473,7 +1484,9 @@ pgss_ProcessUtility(PlannedStmt *pstmt, const char *queryString,
 				   0,			/* signal that it's a utility stmt */
 				   pstmt->stmt_location,
 				   pstmt->stmt_len,
-				   INSTR_TIME_GET_MILLISEC(duration) + (yb_session_stats.exponential_backoff_time * 1000.0),
+				//    INSTR_TIME_GET_MILLISEC(duration) + (yb_session_stats.exponential_backoff_time * 1000.0),
+					  (yb_session_stats.explain_retry_time == 0 ? INSTR_TIME_GET_MILLISEC(duration) : (yb_session_stats.explain_retry_time * 1000.0)),
+					// INSTR_TIME_GET_MILLISEC(duration),
 				   rows,
 				   &bufusage,
 				   NULL);

@@ -1102,10 +1102,13 @@ typedef struct YbSessionStats
 	YBCPgExecStats		latest_snapshot;
 	int64 				no_of_retries;
 	instr_time			start_time;	
+	instr_time			pgss_start_time;	
 	double 				total_execution_time;
 	double 				explain_retry_time;
+	double 				pgss_retry_time;
 	double 				exponential_backoff_time;
 	bool				is_timing;
+	bool				is_timing_pgss;
 } YbSessionStats;
 extern YbSessionStats yb_session_stats;
 
