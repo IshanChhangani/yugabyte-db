@@ -830,13 +830,8 @@ YBCheckDefinedOids()
  * happen. This model helps avoid making copies of the stats and passing it
  * back/forth.
  */
-typedef struct YbSessionStats
-{
-	YBCPgExecStatsState current_state;
-	YBCPgExecStats		latest_snapshot;
-} YbSessionStats;
 
-static YbSessionStats yb_session_stats = {0};
+YbSessionStats yb_session_stats = {0};
 
 void
 YBInitPostgresBackend(

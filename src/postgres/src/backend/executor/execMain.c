@@ -375,6 +375,7 @@ standard_ExecutorRun(QueryDesc *queryDesc,
 		InstrStopNode(queryDesc->totaltime, estate->es_processed);
 
 	MemoryContextSwitchTo(oldcontext);
+	yb_session_stats.total_execution_time += INSTR_TIME_GET_DOUBLE(queryDesc->totaltime->counter);
 }
 
 /* ----------------------------------------------------------------
@@ -439,7 +440,7 @@ standard_ExecutorFinish(QueryDesc *queryDesc)
 		InstrStopNode(queryDesc->totaltime, 0);
 
 	MemoryContextSwitchTo(oldcontext);
-
+	
 	estate->es_finished = true;
 }
 
@@ -513,6 +514,12 @@ standard_ExecutorEnd(QueryDesc *queryDesc)
 	queryDesc->planstate = NULL;
 	queryDesc->totaltime = NULL;
 	queryDesc->yb_query_stats = NULL;
+	
+	yb_session_stats.total_execution_time = 0;
+	yb_session_stats.no_of_retries = 0;
+	yb_session_stats.explain_retry_time = 0;
+	yb_session_stats.is_timing = false;
+	yb_session_stats.exponential_backoff_time = 0;
 }
 
 /* ----------------------------------------------------------------

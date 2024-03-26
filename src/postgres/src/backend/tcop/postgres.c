@@ -4512,7 +4512,9 @@ static void yb_maybe_sleep_on_txn_conflict(int attempt)
 		 * conflicting transactions have ended (either committed or aborted).
 		 */
 		pgstat_report_wait_start(WAIT_EVENT_YB_TXN_CONFLICT_BACKOFF);
-		pg_usleep(yb_get_sleep_usecs_on_txn_conflict(attempt));
+		long wait_time = yb_get_sleep_usecs_on_txn_conflict(attempt);
+		yb_session_stats.exponential_backoff_time += wait_time / 1000000.0; // in seconds
+		pg_usleep(wait_time);
 		pgstat_report_wait_end();
 	}
 }
@@ -4725,11 +4727,13 @@ yb_exec_query_wrapper(MemoryContext exec_context,
 					  const void* functor_context)
 {
 	bool retry = true;
-	for (int attempt = 0; retry; ++attempt)
+	int attempt;
+	for (attempt = 0; retry; ++attempt)
 	{
 		yb_exec_query_wrapper_one_attempt(
 			exec_context, restart_data, functor, functor_context, attempt, &retry);
 	}
+	yb_session_stats.no_of_retries = attempt - 1;
 }
 
 static void
