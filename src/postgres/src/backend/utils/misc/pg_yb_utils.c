@@ -830,8 +830,58 @@ YBCheckDefinedOids()
  * happen. This model helps avoid making copies of the stats and passing it
  * back/forth.
  */
+typedef struct YbSessionStats
+{
+	YBCPgExecStatsState current_state;
+	YBCPgExecStats		latest_snapshot;
+	int64 				no_of_retries;
+	instr_time			plan_time;	
+	double 				retry_execution_time;
+	double 				backoff_time;
+} YbSessionStats;
 
-YbSessionStats yb_session_stats = {0};
+static YbSessionStats yb_session_stats = {0};
+
+double YbGetNoOfRetries()
+{
+	return yb_session_stats.no_of_retries;
+}
+
+instr_time YbGetPlanTime()
+{
+	return yb_session_stats.plan_time;
+}
+
+double YbGetRetryExecutionTime()
+{
+	return yb_session_stats.retry_execution_time;
+}
+
+double YbGetBackoffTime()
+{
+	return yb_session_stats.backoff_time;
+}
+
+void YbSetNoOfRetries(int64 no_of_retries)
+{
+	yb_session_stats.no_of_retries = no_of_retries;
+}
+
+void YbSetPlanTime(instr_time plan_time)
+{
+	yb_session_stats.plan_time = plan_time;
+}
+
+
+void YbSetRetryExecutionTime(double retry_execution_time)
+{
+	yb_session_stats.retry_execution_time = retry_execution_time;
+}
+
+void YbSetBackoffTime(double backoff_time)
+{
+	yb_session_stats.backoff_time = backoff_time;
+}
 
 void
 YBInitPostgresBackend(
@@ -2181,8 +2231,8 @@ void YBEndOperationsBufferingRetry(QueryDesc* queryDesc) {
 			instr_time endtime;
 			INSTR_TIME_SET_CURRENT(endtime);
 			INSTR_TIME_SUBTRACT(endtime, queryDesc->totaltime->starttime);
-			yb_session_stats.total_execution_time += INSTR_TIME_GET_DOUBLE(endtime);
-			yb_session_stats.total_execution_time += INSTR_TIME_GET_DOUBLE(queryDesc->totaltime->counter);
+			yb_session_stats.retry_execution_time += INSTR_TIME_GET_DOUBLE(endtime);
+			yb_session_stats.retry_execution_time += INSTR_TIME_GET_DOUBLE(queryDesc->totaltime->counter);
 		}
 		HandleYBStatus(status);
 	}

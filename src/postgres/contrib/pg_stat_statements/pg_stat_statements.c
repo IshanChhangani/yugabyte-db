@@ -1357,12 +1357,13 @@ pgss_ExecutorEnd(QueryDesc *queryDesc)
 		 * levels of hook all do this.)
 		 */
 		InstrEndLoop(queryDesc->totaltime);
-		// yb_session_stats.total_execution_time += queryDesc->totaltime->total;
+
 		pgss_store(queryDesc->sourceText,
 				   queryId,
 				   queryDesc->plannedstmt->stmt_location,
 				   queryDesc->plannedstmt->stmt_len,
-				   (queryDesc->totaltime->total + yb_session_stats.exponential_backoff_time + yb_session_stats.total_execution_time) * 1000.0,
+				//    (queryDesc->totaltime->total + yb_session_stats.exponential_backoff_time + yb_session_stats.retry_execution_time) * 1000.0,
+				   (queryDesc->totaltime->total + YbGetBackoffTime() + YbGetRetryExecutionTime()) * 1000.0,
 				   queryDesc->estate->es_processed,
 				   &queryDesc->totaltime->bufusage,
 				   NULL);
@@ -1473,7 +1474,8 @@ pgss_ProcessUtility(PlannedStmt *pstmt, const char *queryString,
 				   0,			/* signal that it's a utility stmt */
 				   pstmt->stmt_location,
 				   pstmt->stmt_len,
-				   INSTR_TIME_GET_MILLISEC(duration) + ((yb_session_stats.exponential_backoff_time + yb_session_stats.total_execution_time) * 1000.0),
+				//    INSTR_TIME_GET_MILLISEC(duration) + ((yb_session_stats.exponential_backoff_time + yb_session_stats.retry_execution_time) * 1000.0),
+				   INSTR_TIME_GET_MILLISEC(duration) + ((YbGetBackoffTime() + YbGetRetryExecutionTime()) * 1000.0),
 				   rows,
 				   &bufusage,
 				   NULL);

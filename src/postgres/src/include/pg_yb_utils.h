@@ -1098,17 +1098,15 @@ extern SortByDir YbSortOrdering(SortByDir ordering, bool is_colocated, bool is_t
 extern void YbGetRedactedQueryString(const char* query, int query_len,
 									 const char** redacted_query, int* redacted_query_len);
 
-typedef struct YbSessionStats
-{
-	YBCPgExecStatsState current_state;
-	YBCPgExecStats		latest_snapshot;
-	int64 				no_of_retries;
-	instr_time			start_time;	
-	double 				total_execution_time;
-	double 				explain_retry_time;
-	double 				exponential_backoff_time;
-} YbSessionStats;
-extern YbSessionStats yb_session_stats;
 
+//getter/setters for yb_session_stats
+extern double YbGetNoOfRetries();
+extern instr_time YbGetPlanTime();
+extern double YbGetRetryExecutionTime();
+extern double YbGetBackoffTime();
+extern void YbSetNoOfRetries(int64 no_of_retries);
+extern void YbSetPlanTime(instr_time plan_time);
+extern void YbSetRetryExecutionTime(double retry_execution_time);
+extern void YbSetBackoffTime(double backoff_time);
 
 #endif /* PG_YB_UTILS_H */

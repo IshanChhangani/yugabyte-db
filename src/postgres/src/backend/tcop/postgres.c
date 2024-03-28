@@ -4513,7 +4513,8 @@ static void yb_maybe_sleep_on_txn_conflict(int attempt)
 		 */
 		pgstat_report_wait_start(WAIT_EVENT_YB_TXN_CONFLICT_BACKOFF);
 		long wait_time = yb_get_sleep_usecs_on_txn_conflict(attempt);
-		yb_session_stats.exponential_backoff_time += wait_time / 1000000.0; // in seconds
+		YbSetBackoffTime(YbGetBackoffTime() + wait_time / 1000000.0);
+		// yb_session_stats.exponential_backoff_time += wait_time / 1000000.0; // in seconds
 		pg_usleep(wait_time);
 		pgstat_report_wait_end();
 	}
@@ -4731,15 +4732,22 @@ yb_exec_query_wrapper(MemoryContext exec_context,
 	for (attempt = 0; retry; ++attempt)
 	{
 		if(attempt == 0){
-			yb_session_stats.total_execution_time = 0;
-			yb_session_stats.no_of_retries = 0;
-			yb_session_stats.explain_retry_time = 0;
-			yb_session_stats.exponential_backoff_time = 0;
+			YbSetRetryExecutionTime(0);
+			instr_time nulltime;
+			INSTR_TIME_SET_ZERO(nulltime);
+			YbSetPlanTime(nulltime);
+			YbSetNoOfRetries(0);
+			YbSetBackoffTime(0);
+			// yb_session_stats.retry_execution_time = 0;
+			// yb_session_stats.no_of_retries = 0;
+			// yb_session_stats.exponential_backoff_time = 0;
+			// INSTR_TIME_SET_ZERO(yb_session_stats.plan_time);
 		}
 		yb_exec_query_wrapper_one_attempt(
 			exec_context, restart_data, functor, functor_context, attempt, &retry);
+		// yb_session_stats.no_of_retries++;
+		YbSetNoOfRetries(YbGetNoOfRetries() + 1);
 	}
-	yb_session_stats.no_of_retries = attempt - 1;
 }
 
 static void
