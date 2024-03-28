@@ -1215,6 +1215,7 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 {
 	DestReceiver *dest;
 	QueryDesc  *queryDesc;
+	// double 		queryDescTime;	
 	instr_time	starttime;
 	double		totaltime = 0;
 	int			eflags;
@@ -1236,11 +1237,7 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 	 * timing is off, so we don't look at es->timing here.  (We could skip
 	 * this if !es->summary, but it's hardly worth the complication.)
 	 */
-	if(!yb_session_stats.is_timing){
-		yb_session_stats.is_timing = true;
-		yb_session_stats.explain_retry_time = 0;
-		INSTR_TIME_SET_CURRENT(yb_session_stats.start_time);
-	}
+	INSTR_TIME_SET_CURRENT(starttime);
 
 	/*
 	 * Use a snapshot with an updated command ID to ensure this query sees
@@ -1316,7 +1313,7 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 		}
 
 		/* We can't run ExecutorEnd 'till we're done printing the stats... */
-		yb_session_stats.explain_retry_time = elapsed_time(&yb_session_stats.start_time);
+		totaltime += elapsed_time(&starttime);
 	}
 
 	ExplainOpenGroup("Query", NULL, true, es);
@@ -1348,7 +1345,7 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 	 * Close down the query and free resources.  Include time for this in the
 	 * total execution time (although it should be pretty minimal).
 	 */
-	totaltime = yb_session_stats.explain_retry_time;
+	// queryDescTime = INSTR_TIME_GET_DOUBLE(queryDesc->totaltime->counter);
 	INSTR_TIME_SET_CURRENT(starttime);
 
 	ExecutorEnd(queryDesc);
@@ -1372,7 +1369,7 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 	if (es->summary && es->analyze)
 	{
 		if (show_variable_fields)
-			ExplainPropertyFloat("Execution Time", "ms", 1000.0 * totaltime, 3,
+			ExplainPropertyFloat("Execution Time", "ms", 1000.0 * (yb_session_stats.total_execution_time + yb_session_stats.exponential_backoff_time + totaltime), 3,
 								 es);
 
 		if (es->rpc)

@@ -4730,6 +4730,12 @@ yb_exec_query_wrapper(MemoryContext exec_context,
 	int attempt;
 	for (attempt = 0; retry; ++attempt)
 	{
+		if(attempt == 0){
+			yb_session_stats.total_execution_time = 0;
+			yb_session_stats.no_of_retries = 0;
+			yb_session_stats.explain_retry_time = 0;
+			yb_session_stats.exponential_backoff_time = 0;
+		}
 		yb_exec_query_wrapper_one_attempt(
 			exec_context, restart_data, functor, functor_context, attempt, &retry);
 	}

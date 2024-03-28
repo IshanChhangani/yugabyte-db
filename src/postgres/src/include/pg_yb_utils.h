@@ -31,6 +31,7 @@
 #include "access/reloptions.h"
 #include "catalog/pg_database.h"
 #include "common/pg_yb_common.h"
+#include "executor/execdesc.h"
 #include "executor/instrument.h"
 #include "nodes/parsenodes.h"
 #include "nodes/plannodes.h"
@@ -699,6 +700,7 @@ YbDdlModeOptional YbGetDdlMode(
 
 extern void YBBeginOperationsBuffering();
 extern void YBEndOperationsBuffering();
+extern void YBEndOperationsBufferingRetry(QueryDesc* queryDesc);
 extern void YBResetOperationsBuffering();
 extern void YBFlushBufferedOperations();
 
@@ -1105,7 +1107,6 @@ typedef struct YbSessionStats
 	double 				total_execution_time;
 	double 				explain_retry_time;
 	double 				exponential_backoff_time;
-	bool				is_timing;
 } YbSessionStats;
 extern YbSessionStats yb_session_stats;
 

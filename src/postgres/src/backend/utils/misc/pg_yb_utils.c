@@ -2171,7 +2171,24 @@ void YBBeginOperationsBuffering() {
 	}
 }
 
-void YBEndOperationsBuffering() {
+void YBEndOperationsBufferingRetry(QueryDesc* queryDesc) {
+	// buffering_nesting_level could be 0 because YBResetOperationsBuffering was called
+	// on starting new query and postgres calls standard_ExecutorFinish on non finished executor
+	// from previous failed query.
+	if (buffering_nesting_level && !--buffering_nesting_level) {
+		YBCStatus status = YBCPgStopOperationsBuffering();
+		if(status != NULL && queryDesc != NULL){ //in case of retry
+			instr_time endtime;
+			INSTR_TIME_SET_CURRENT(endtime);
+			INSTR_TIME_SUBTRACT(endtime, queryDesc->totaltime->starttime);
+			yb_session_stats.total_execution_time += INSTR_TIME_GET_DOUBLE(endtime);
+			yb_session_stats.total_execution_time += INSTR_TIME_GET_DOUBLE(queryDesc->totaltime->counter);
+		}
+		HandleYBStatus(status);
+	}
+}
+
+void YBEndOperationsBuffering(){
 	// buffering_nesting_level could be 0 because YBResetOperationsBuffering was called
 	// on starting new query and postgres calls standard_ExecutorFinish on non finished executor
 	// from previous failed query.
@@ -2179,7 +2196,6 @@ void YBEndOperationsBuffering() {
 		HandleYBStatus(YBCPgStopOperationsBuffering());
 	}
 }
-
 void YBResetOperationsBuffering() {
 	buffering_nesting_level = 0;
 	YBCPgResetOperationsBuffering();
