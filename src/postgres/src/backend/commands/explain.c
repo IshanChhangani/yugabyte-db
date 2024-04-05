@@ -1111,14 +1111,19 @@ ExplainOneQuery(Query *query, int cursorOptions,
 		instr_time	planstart,
 					planduration;
 
-		INSTR_TIME_SET_CURRENT(planstart);
+		if (*(YbGetCurrentQueryExecutionInfo().no_of_attempts) == 0)
+			INSTR_TIME_SET_CURRENT(planstart);
 
 		/* plan the query */
 		plan = pg_plan_query(query, cursorOptions, params);
 
-		INSTR_TIME_SET_CURRENT(planduration);
-		INSTR_TIME_SUBTRACT(planduration, planstart);
+		if (*(YbGetCurrentQueryExecutionInfo().no_of_attempts) == 0) {
+			INSTR_TIME_SET_CURRENT(planduration);
+			INSTR_TIME_SUBTRACT(planduration, planstart);
+			YbSetPlanTime(planduration);
+		}
 
+		planduration = YbGetPlanTime();
 		/* run it (if needed) and produce output */
 		ExplainOnePlan(plan, into, es, queryString, params, queryEnv,
 					   &planduration);
@@ -1369,9 +1374,11 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 	 */
 	if (es->summary && es->analyze)
 	{
-		if (show_variable_fields)
-			ExplainPropertyFloat("Execution Time", "ms", 1000.0 * totaltime, 3,
+		if (show_variable_fields) {
+			ExplainPropertyFloat("Execution Time", "ms", 
+								 1000.0 * (YbGetTotalTime(totaltime)), 3,
 								 es);
+		}
 
 		if (es->rpc)
 		{

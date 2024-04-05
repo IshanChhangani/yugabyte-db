@@ -1362,7 +1362,7 @@ pgss_ExecutorEnd(QueryDesc *queryDesc)
 				   queryId,
 				   queryDesc->plannedstmt->stmt_location,
 				   queryDesc->plannedstmt->stmt_len,
-				   queryDesc->totaltime->total * 1000.0,	/* convert to msec */
+				   (YbGetTotalTime(queryDesc->totaltime->total)) * 1000.0,
 				   queryDesc->estate->es_processed,
 				   &queryDesc->totaltime->bufusage,
 				   NULL);
@@ -1473,7 +1473,7 @@ pgss_ProcessUtility(PlannedStmt *pstmt, const char *queryString,
 				   0,			/* signal that it's a utility stmt */
 				   pstmt->stmt_location,
 				   pstmt->stmt_len,
-				   INSTR_TIME_GET_MILLISEC(duration),
+				   YbGetTotalTime(INSTR_TIME_GET_DOUBLE(duration))*1000,
 				   rows,
 				   &bufusage,
 				   NULL);

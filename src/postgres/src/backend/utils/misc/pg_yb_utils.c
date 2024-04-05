@@ -833,11 +833,65 @@ YBCheckDefinedOids()
  */
 typedef struct YbSessionStats
 {
-	YBCPgExecStatsState current_state;
-	YBCPgExecStats		latest_snapshot;
+	YBCPgExecStatsState 				current_state;
+	YBCPgExecStats						latest_snapshot;
+	CurrentQueryExecutionInfo			current_query_execution_info;
 } YbSessionStats;
 
 static YbSessionStats yb_session_stats = {0};
+
+void YbInitCurrentQueryExecutionInfo()
+{
+	instr_time nulltime;
+	INSTR_TIME_SET_ZERO(nulltime);
+	yb_session_stats.current_query_execution_info = (CurrentQueryExecutionInfo){
+		.no_of_attempts = NULL,
+		.plan_time = nulltime,
+		.backoff_time_ms = 0,
+		.retry_execution_time_ms = 0,
+	};
+}
+
+void YbSetNoOfRetries(int *attempt){
+	yb_session_stats.current_query_execution_info.no_of_attempts = attempt;
+}
+
+CurrentQueryExecutionInfo YbGetCurrentQueryExecutionInfo()
+{
+	return yb_session_stats.current_query_execution_info;
+}
+
+void YbSetCurrentQueryExecutionInfo(CurrentQueryExecutionInfo retry_info)
+{
+	yb_session_stats.current_query_execution_info = retry_info;
+}
+
+instr_time YbGetPlanTime()
+{
+	return yb_session_stats.current_query_execution_info.plan_time;
+}
+
+void YbSetPlanTime(instr_time plan_time)
+{
+	yb_session_stats.current_query_execution_info.plan_time = plan_time;
+}
+
+void YbIncrementBackoffTime(double backoff_time)
+{
+    yb_session_stats.current_query_execution_info.backoff_time_ms += backoff_time;
+}
+
+void YbIncrementRetryExecutionTime(double retry_execution_time)
+{
+    yb_session_stats.current_query_execution_info.retry_execution_time_ms += retry_execution_time;
+}
+
+double YbGetTotalTime(double successful_attempt_time) //returns total time in ms
+{
+	return yb_session_stats.current_query_execution_info.retry_execution_time_ms + 
+		   yb_session_stats.current_query_execution_info.backoff_time_ms + 
+		   successful_attempt_time;
+}
 
 void
 YBInitPostgresBackend(
@@ -2196,11 +2250,29 @@ void YBBeginOperationsBuffering() {
 }
 
 void YBEndOperationsBuffering() {
-	// buffering_nesting_level could be 0 because YBResetOperationsBuffering was called
-	// on starting new query and postgres calls standard_ExecutorFinish on non finished executor
-	// from previous failed query.
+	YBEndOperationsBufferingWithInstr(NULL);
+}
+
+/*
+ * YBEndOperationsBufferingWithAccumulation is used to accumulate the time spent on retries
+ * This function is a copy of YBEndOperationsBuffering with the addition queryDesc parameter.
+ */
+void YBEndOperationsBufferingWithInstr(QueryDesc* queryDesc) {
+/*
+ * buffering_nesting_level could be 0 because YBResetOperationsBuffering was called
+ * on starting new query and postgres calls standard_ExecutorFinish on non finished executor
+ * from previous failed query.
+ */
 	if (buffering_nesting_level && !--buffering_nesting_level) {
-		HandleYBStatus(YBCPgStopOperationsBuffering());
+		YBCStatus status = YBCPgStopOperationsBuffering();
+		if (queryDesc && status != NULL) { //in case of retry
+			instr_time endtime;
+			INSTR_TIME_SET_CURRENT(endtime);
+			INSTR_TIME_SUBTRACT(endtime, queryDesc->totaltime->starttime);
+			YbIncrementRetryExecutionTime(INSTR_TIME_GET_DOUBLE(endtime)); // Time from ExecutorFinish
+			YbIncrementRetryExecutionTime(INSTR_TIME_GET_DOUBLE(queryDesc->totaltime->counter)); // Time from ExecutorRun
+		}
+		HandleYBStatus(status);
 	}
 }
 

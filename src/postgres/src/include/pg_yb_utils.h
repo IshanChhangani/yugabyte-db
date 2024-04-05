@@ -31,6 +31,7 @@
 #include "access/reloptions.h"
 #include "catalog/pg_database.h"
 #include "common/pg_yb_common.h"
+#include "executor/execdesc.h"
 #include "executor/instrument.h"
 #include "nodes/parsenodes.h"
 #include "nodes/plannodes.h"
@@ -704,11 +705,19 @@ typedef struct YbDdlModeOptional
 	YbDdlMode value;
 } YbDdlModeOptional;
 
+typedef struct YbRetryInfo {
+	int				   	*no_of_attempts;
+	instr_time			plan_time;	
+	double 				retry_execution_time_ms;
+	double 				backoff_time_ms;
+} CurrentQueryExecutionInfo;
+
 YbDdlModeOptional YbGetDdlMode(
 	PlannedStmt *pstmt, ProcessUtilityContext context);
 
 extern void YBBeginOperationsBuffering();
 extern void YBEndOperationsBuffering();
+extern void YBEndOperationsBufferingWithInstr(QueryDesc* queryDesc);
 extern void YBResetOperationsBuffering();
 extern void YBFlushBufferedOperations();
 
@@ -1111,4 +1120,17 @@ extern void YbRelationSetNewRelfileNode(Relation rel, Oid relfileNodeId,
 										bool is_truncate);
 
 extern void YBCUpdateYbReadTimeAndInvalidateRelcache(uint64_t read_time);
+/*
+ * getter/setters for yb_session_stats
+ */
+extern void YbInitCurrentQueryExecutionInfo();
+extern CurrentQueryExecutionInfo YbGetCurrentQueryExecutionInfo();
+extern void YbSetCurrentQueryExecutionInfo(CurrentQueryExecutionInfo retry_info);
+extern instr_time YbGetPlanTime();
+extern void YbSetNoOfRetries(int* attempt);
+extern void YbIncrementBackoffTime(double backoff_time);
+extern void YbIncrementRetryExecutionTime(double retry_execution_time);
+extern void YbSetPlanTime(instr_time plan_time);
+extern double YbGetTotalTime(double successful_attempt_time);
+
 #endif /* PG_YB_UTILS_H */
