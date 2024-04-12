@@ -1,0 +1,4 @@
+# yb_query_diagnostics extension
+comment = 'A barebones PostgreSQL extension'
+default_version = '1.0'
+module_pathname = '$libdir/yb_query_diagnostics'

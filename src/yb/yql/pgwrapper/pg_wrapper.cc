@@ -444,7 +444,7 @@ Result<string> WritePostgresConfig(const PgProcessConf& conf) {
   metricsLibs.push_back("yb_pg_metrics");
   metricsLibs.push_back("pgaudit");
   metricsLibs.push_back("pg_hint_plan");
-
+  metricsLibs.push_back("yb_query_diagnostics");
   vector<string> lines;
   string line;
   while (std::getline(conf_file, line)) {
