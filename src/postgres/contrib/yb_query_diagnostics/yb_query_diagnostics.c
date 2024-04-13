@@ -161,17 +161,14 @@ print_table_indexes(Oid relid)
 
     /* Print each index */
     foreach(lc, indexlist)
-    {
+    {   
         Oid         indexoid = lfirst_oid(lc);
         char        *indexname = get_rel_name(indexoid);
 
         if (indexname != NULL){
 
-            char* constraintDef = pg_get_constraintdef_command(indexoid);
-
             FILE* fptr = fopen("/Users/ishanchhangani/table.txt","a");
             fprintf(fptr, "Index: %s\n" , indexname);
-            fprintf(fptr, "Index : %s\n" , constraintDef);
             fclose(fptr);
         }
     }
