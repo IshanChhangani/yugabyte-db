@@ -107,6 +107,7 @@
 #include "pgstat.h"
 #include "nodes/readfuncs.h"
 #include "yb_ash.h"
+#include "yb_query_diagnostics.h"
 
 #ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
@@ -864,8 +865,13 @@ YBInitPostgresBackend(
 		ash_config.yb_enable_ash = &yb_enable_ash;
 		YBCInitPgGate(type_table, count, callbacks, session_id, &ash_config);
 		YBCInstallTxnDdlHook();
+		FILE* fptr = fopen("/Users/ishanchhangani/test.txt","a");
+		fprintf(fptr, "%d",yb_enable_query_diagnostics);
+		fclose(fptr);
 		if (yb_ash_enable_infra)
 			YbAshInstallHooks();
+		if(yb_enable_query_diagnostics)
+			YbQueryDiagnosticsInstallHooks();
 
 		/*
 		 * For each process, we create one YBC session for PostgreSQL to use

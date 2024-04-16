@@ -53,6 +53,10 @@ DEFINE_RUNTIME_PG_PREVIEW_FLAG(bool, yb_enable_ash, false,
     "and various background activities. This does nothing if "
     "ysql_yb_enable_ash_infra is disabled.");
 
+
+DEFINE_test_flag(bool, yb_enable_query_diagnostics, false,
+    "enable query diagnostics");
+
 DEFINE_test_flag(bool, export_wait_state_names, yb::kIsDebug,
     "Exports wait-state name as a human understandable string.");
 DEFINE_test_flag(bool, trace_ash_wait_code_updates, yb::kIsDebug,
