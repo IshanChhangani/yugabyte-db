@@ -89,6 +89,7 @@
 #include "utils/memutils.h"
 
 #include "common/pg_yb_common.h"
+#include "yb_query_diagnostics.h"
 
 
 #include "yb/yql/pggate/webserver/pgsql_webserver_wrapper.h"
@@ -166,29 +167,29 @@ typedef struct pgssHashKey
 /*
  * The actual stats counters kept within pgssEntry.
  */
-typedef struct Counters
-{
-	int64		calls;			/* # of times executed */
-	double		total_time;		/* total execution time, in msec */
-	double		min_time;		/* minimum execution time in msec */
-	double		max_time;		/* maximum execution time in msec */
-	double		mean_time;		/* mean execution time in msec */
-	double		sum_var_time;	/* sum of variances in execution time in msec */
-	int64		rows;			/* total # of retrieved or affected rows */
-	int64		shared_blks_hit;	/* # of shared buffer hits */
-	int64		shared_blks_read;	/* # of shared disk blocks read */
-	int64		shared_blks_dirtied;	/* # of shared disk blocks dirtied */
-	int64		shared_blks_written;	/* # of shared disk blocks written */
-	int64		local_blks_hit; /* # of local buffer hits */
-	int64		local_blks_read;	/* # of local disk blocks read */
-	int64		local_blks_dirtied; /* # of local disk blocks dirtied */
-	int64		local_blks_written; /* # of local disk blocks written */
-	int64		temp_blks_read; /* # of temp blocks read */
-	int64		temp_blks_written;	/* # of temp blocks written */
-	double		blk_read_time;	/* time spent reading, in msec */
-	double		blk_write_time; /* time spent writing, in msec */
-	double		usage;			/* usage factor */
-} Counters;
+// typedef struct Counters
+// {
+// 	int64		calls;			/* # of times executed */
+// 	double		total_time;		/* total execution time, in msec */
+// 	double		min_time;		/* minimum execution time in msec */
+// 	double		max_time;		/* maximum execution time in msec */
+// 	double		mean_time;		/* mean execution time in msec */
+// 	double		sum_var_time;	/* sum of variances in execution time in msec */
+// 	int64		rows;			/* total # of retrieved or affected rows */
+// 	int64		shared_blks_hit;	/* # of shared buffer hits */
+// 	int64		shared_blks_read;	/* # of shared disk blocks read */
+// 	int64		shared_blks_dirtied;	/* # of shared disk blocks dirtied */
+// 	int64		shared_blks_written;	/* # of shared disk blocks written */
+// 	int64		local_blks_hit; /* # of local buffer hits */
+// 	int64		local_blks_read;	/* # of local disk blocks read */
+// 	int64		local_blks_dirtied; /* # of local disk blocks dirtied */
+// 	int64		local_blks_written; /* # of local disk blocks written */
+// 	int64		temp_blks_read; /* # of temp blocks read */
+// 	int64		temp_blks_written;	/* # of temp blocks written */
+// 	double		blk_read_time;	/* time spent reading, in msec */
+// 	double		blk_write_time; /* time spent writing, in msec */
+// 	double		usage;			/* usage factor */
+// } Counters;
 
 /*
  * hdr_histogram

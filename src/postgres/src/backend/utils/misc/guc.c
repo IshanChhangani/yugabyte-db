@@ -2567,17 +2567,6 @@ static struct config_bool ConfigureNamesBool[] =
 		false,
 		yb_enable_ash_check_hook, NULL, NULL
 	},
-	{
-		{"yb_enable_query_diagnostics", PGC_POSTMASTER, RESOURCES,
-			gettext_noop("Enable query diagnostics."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&yb_enable_query_diagnostics,
-		false,
-		yb_enable_query_diagnostics_check_hook, NULL, NULL
-	},
-
 	/* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, false, NULL, NULL, NULL

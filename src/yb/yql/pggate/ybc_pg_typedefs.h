@@ -393,6 +393,7 @@ typedef struct PgGFlagsAccessor {
   const bool*     ysql_use_relcache_file;
   const bool*     ysql_enable_pg_per_database_oid_allocator;
   const bool*     ysql_enable_db_catalog_version_mode;
+  const bool*     yb_enable_query_diagnostics;
 } YBCPgGFlagsAccessor;
 
 typedef struct YbTablePropertiesData {

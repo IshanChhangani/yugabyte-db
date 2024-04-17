@@ -10486,4 +10486,12 @@
   proargmodes => '{o,o,o,o,o,o,o,o,o,o,o,o}',
   proargnames => '{sample_time,root_request_id,rpc_request_id,wait_event_component,wait_event_class,wait_event,top_level_node_id,query_id,ysql_session_id,client_node_ip,wait_event_aux,sample_weight}',
   prosrc => 'yb_active_session_history'},
+
+{ oid => '8066', 
+  descr => 'enables query diagnostics',
+  proname => 'yb_query_diagnostics', 
+  provolatile => 'v', proisstrict => 'f', proparallel => 's',
+  prorettype => 'text', proargtypes => 'int8 int8 bool bool bool int8 int8', 
+  proargnames => '{query_id, explain_sample_rate, explain_analyze, explain_dist, explain_debug, bind_var_query_min_duration_ms, diagnostics_interval_sec}',
+  prosrc => 'yb_query_diagnostics' },
 ]

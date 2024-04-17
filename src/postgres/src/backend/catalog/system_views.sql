@@ -1285,3 +1285,10 @@ GRANT EXECUTE ON FUNCTION pg_ls_waldir() TO pg_monitor;
 GRANT pg_read_all_settings TO pg_monitor;
 GRANT pg_read_all_stats TO pg_monitor;
 GRANT pg_stat_scan_tables TO pg_monitor;
+
+CREATE OR REPLACE FUNCTION
+  yb_query_diagnostics (query_id int8, explain_sample_rate int8, explain_analyze bool, explain_dist bool, explain_debug bool, bind_var_query_min_duration_ms int8, diagnostics_interval_sec int8)
+RETURNS text
+LANGUAGE INTERNAL
+STABLE PARALLEL SAFE
+AS 'yb_query_diagnostics';

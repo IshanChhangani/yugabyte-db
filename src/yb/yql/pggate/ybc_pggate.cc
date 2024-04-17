@@ -90,6 +90,9 @@ DEFINE_UNKNOWN_bool(ysql_disable_server_file_access, false,
 
 DEFINE_NON_RUNTIME_bool(ysql_enable_profile, false, "Enable PROFILE feature.");
 
+DEFINE_test_flag(bool, yb_enable_query_diagnostics,true,
+    "enable query diagnostics");
+
 // This gflag should be deprecated but kept to avoid breaking some customer
 // clusters using it. Use ysql_catalog_preload_additional_table_list if possible.
 DEFINE_NON_RUNTIME_bool(ysql_catalog_preload_additional_tables, false,
@@ -1858,6 +1861,7 @@ const YBCPgGFlagsAccessor* YBCGetGFlags() {
           &FLAGS_ysql_enable_pg_per_database_oid_allocator,
       .ysql_enable_db_catalog_version_mode =
           &FLAGS_ysql_enable_db_catalog_version_mode,
+      .yb_enable_query_diagnostics = &FLAGS_TEST_yb_enable_query_diagnostics,
   };
   // clang-format on
   return &accessor;
