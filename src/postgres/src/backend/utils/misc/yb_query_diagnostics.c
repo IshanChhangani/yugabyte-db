@@ -23,8 +23,8 @@ static ExecutorRun_hook_type prev_ExecutorRun = NULL;
 static ExecutorFinish_hook_type prev_ExecutorFinish = NULL; 
 static ExecutorEnd_hook_type prev_ExecutorEnd = NULL;
 
-SharedBundleVariables *shared_bundle_variables = NULL;
 HTAB *query_diagnostics_hash = NULL;
+QueryDiagnosticsEntry* current_query_entry;
 
 static void queryDiagnostics_ExecutorStart(QueryDesc *queryDesc, int eflags);
 static void queryDiagnostics_ExecutorRun(QueryDesc *queryDesc, ScanDirection direction, uint64 count, bool execute_once);
@@ -34,12 +34,14 @@ static void print_schema_details(List *rtable, QueryDiagnosticsEntry* queryDiagn
 static void print_table_columns(Oid relid);
 static void print_table_indexes(Oid relid);
 static void print_table_foreign_keys(Oid relid);
-static void create_shared_hashtable(void);
 static void insert_into_shared_hashtable(HTAB *htab, int64 key, QueryDiagnosticsEntry value);
 static QueryDiagnosticsEntry* lookup_in_shared_hashtable(HTAB *htab, int64 key);
 static void remove_from_shared_hashtable(HTAB *htab, int64 key);
+static QueryDiagnosticsParameters fetchParams(FunctionCallInfo fcinfo);
+static char* format_params(ParamListInfo params);
 
-void YbQueryDiagnosticsInstallHooks(void)
+void 
+YbQueryDiagnosticsInstallHooks(void)
 {
     prev_ExecutorStart = ExecutorStart_hook;
     ExecutorStart_hook = queryDiagnostics_ExecutorStart;
@@ -53,7 +55,8 @@ void YbQueryDiagnosticsInstallHooks(void)
     prev_ExecutorEnd = ExecutorEnd_hook;
     ExecutorEnd_hook = queryDiagnostics_ExecutorEnd;
 }
-char *
+
+static char* 
 format_params(ParamListInfo params)
 {
     StringInfoData buf;
@@ -98,7 +101,13 @@ Size
 YbQueryDiagnosticsShmemSize(void)
 {
 	Size		size;
-	size = sizeof(SharedBundleVariables);
+    // int hash_flags = HASH_ELEM | HASH_BLOBS;
+    // hash_flags |= HASH_SHARED_MEM | HASH_ALLOC | HASH_DIRSIZE;
+    // HASHCTL ctl;
+    // ctl.keysize = sizeof(int64);
+    // ctl.entrysize = sizeof(HashEntry);
+	// size = hash_get_shared_size(&ctl, hash_flags);
+    size = sizeof(QueryDiagnosticsEntry) * 110;
 	return size;
 }
 
@@ -109,46 +118,67 @@ YbQueryDiagnosticsShmemSize(void)
 void
 YbQueryDiagnosticsShmemInit(void)
 {
-	bool		found = false;
+    HASHCTL ctl;
 
-    shared_bundle_variables = (SharedBundleVariables *) ShmemInitStruct("Shared variables for query diagnostics",
-                                                    YbQueryDiagnosticsShmemSize(),
-                                                    &found);
+    /* Initialize the hash table control structure */
+    memset(&ctl, 0, sizeof(ctl));
 
-	if (!found)
-	{
-        /* First time through ... */
-        shared_bundle_variables->isOn = false;
-        shared_bundle_variables->total = 0;
-	}
-
-    //Initialize shared hash table
-    create_shared_hashtable();
+    /* Set the key size and entry size */
+    ctl.keysize = sizeof(int64);
+    ctl.entrysize = sizeof(HashEntry);
+	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
+    /* Create the hash table in shared memory */
+    query_diagnostics_hash = ShmemInitHash("QueryDiagnostics shared hash table", 100, 100, &ctl, HASH_ELEM | HASH_BLOBS);
+	
+	LWLockRelease(AddinShmemInitLock);
 }
 
-static void queryDiagnostics_ExecutorStart(QueryDesc *queryDesc, int eflags)
+static void 
+queryDiagnostics_ExecutorStart(QueryDesc *queryDesc, int eflags)
 {
+    current_query_entry = lookup_in_shared_hashtable(query_diagnostics_hash, queryDesc->plannedstmt->queryId);
+    if (current_query_entry){
+        TimestampTz current_time = GetCurrentTimestamp();
+        // if (current_query_entry->start_time + current_query_entry->params.diagnostics_interval_sec * 1000000 < current_time){
+        if (current_query_entry->start_time + 20 * 1000 * 1000 < current_time){
+            remove_from_shared_hashtable(query_diagnostics_hash, queryDesc->plannedstmt->queryId);
+            current_query_entry = NULL;
+            FILE* fptr = fopen("/Users/ishanchhangani/test.txt","a");
+            fprintf(fptr, "%ld removed from hashtable\n" , queryDesc->plannedstmt->queryId);
+            fclose(fptr);
+        }
+        else{
+            FILE* fptr = fopen("/Users/ishanchhangani/test.txt","a");
+            fprintf(fptr, "QueryId: %ld\n" , queryDesc->plannedstmt->queryId);
+            fclose(fptr);
+        }
+    }
+
+
     if (prev_ExecutorStart)
         prev_ExecutorStart(queryDesc, eflags);
     else
         standard_ExecutorStart(queryDesc, eflags);
 }
 
-static void queryDiagnostics_ExecutorRun(QueryDesc *queryDesc, ScanDirection direction, uint64 count, bool execute_once)
+static void 
+queryDiagnostics_ExecutorRun(QueryDesc *queryDesc, ScanDirection direction, uint64 count, bool execute_once)
 {
     if (prev_ExecutorRun)
         prev_ExecutorRun(queryDesc, direction, count, execute_once);
     else
         standard_ExecutorRun(queryDesc, direction, count, execute_once);
 }
-static void queryDiagnostics_ExecutorFinish(QueryDesc *queryDesc) 
+static void 
+queryDiagnostics_ExecutorFinish(QueryDesc *queryDesc) 
 {
     if (prev_ExecutorFinish)
         prev_ExecutorFinish(queryDesc);
     else
         standard_ExecutorFinish(queryDesc);
 }
-static void queryDiagnostics_ExecutorEnd(QueryDesc *queryDesc)
+static void 
+queryDiagnostics_ExecutorEnd(QueryDesc *queryDesc)
 {
     if (prev_ExecutorEnd)
         prev_ExecutorEnd(queryDesc);
@@ -163,14 +193,12 @@ static void queryDiagnostics_ExecutorEnd(QueryDesc *queryDesc)
         fclose(fptr);
     }
 
-    if(shared_bundle_variables && shared_bundle_variables->isOn){
-        QueryDiagnosticsEntry* queryDiagnosticsEntry = lookup_in_shared_hashtable(query_diagnostics_hash, queryDesc->plannedstmt->queryId);
-        if(queryDiagnosticsEntry)
-            print_schema_details(queryDesc->plannedstmt->rtable, queryDiagnosticsEntry);
-    }
+    // QueryDiagnosticsEntry* queryDiagnosticsEntry = lookup_in_shared_hashtable(query_diagnostics_hash, queryDesc->plannedstmt->queryId);
+    // if(queryDiagnosticsEntry)
+    //     print_schema_details(queryDesc->plannedstmt->rtable, queryDiagnosticsEntry);
 }
 
-void
+static void
 print_schema_details(List *rtable, QueryDiagnosticsEntry* queryDiagnosticsEntry)
 {
     ListCell   *lc;
@@ -204,7 +232,7 @@ print_schema_details(List *rtable, QueryDiagnosticsEntry* queryDiagnosticsEntry)
     }
 }
 
-void
+static void
 print_table_columns(Oid relid)
 {
     Relation    rel;
@@ -235,7 +263,7 @@ print_table_columns(Oid relid)
     relation_close(rel, AccessShareLock);
 }
 
-void
+static void
 print_table_indexes(Oid relid)
 {
     Relation    rel;
@@ -267,7 +295,7 @@ print_table_indexes(Oid relid)
     relation_close(rel, AccessShareLock);
 }
 
-void
+static void
 print_table_foreign_keys(Oid relid)
 {
     SysScanDesc scan;
@@ -344,28 +372,8 @@ print_table_foreign_keys(Oid relid)
     heap_close(conrel, AccessShareLock);
 }
 
-
-
-void
-create_shared_hashtable(void)
-{
-    HASHCTL ctl;
-
-    /* Initialize the hash table control structure */
-    memset(&ctl, 0, sizeof(ctl));
-
-    /* Set the key size and entry size */
-    ctl.keysize = sizeof(int64);
-    ctl.entrysize = sizeof(HashEntry);
-	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
-    /* Create the hash table in shared memory */
-    query_diagnostics_hash = ShmemInitHash("QueryDiagnostics shared hash table", 100, 100, &ctl, HASH_ELEM | HASH_BLOBS);
-	
-	LWLockRelease(AddinShmemInitLock);
-}
-
 /* Insert a value into the shared hash table */
-void
+static void
 insert_into_shared_hashtable(HTAB *htab, int64 key, QueryDiagnosticsEntry value)
 {
     bool found;
@@ -380,7 +388,7 @@ insert_into_shared_hashtable(HTAB *htab, int64 key, QueryDiagnosticsEntry value)
 }
 
 /* Look up a value in the shared hash table */
-QueryDiagnosticsEntry*
+static QueryDiagnosticsEntry*
 lookup_in_shared_hashtable(HTAB *htab, int64 key)
 {
     // bool found;
@@ -401,60 +409,63 @@ lookup_in_shared_hashtable(HTAB *htab, int64 key)
     }
 }
 
-void remove_from_shared_hashtable(HTAB *htab, int64 key) {
+static void 
+remove_from_shared_hashtable(HTAB *htab, int64 key) {
     /* Try to find the key in the hash table and remove it */
     hash_search(htab, &key, HASH_REMOVE, NULL);
+}
+
+static QueryDiagnosticsParameters 
+fetchParams(FunctionCallInfo fcinfo){
+    QueryDiagnosticsParameters params = {0};
+    bool is_queryid_null = PG_ARGISNULL(0);
+	params.query_id = is_queryid_null ? 0 : PG_GETARG_INT64(0);
+
+    bool is_explain_sample_rate_null = PG_ARGISNULL(1);
+	params.explain_sample_rate = is_explain_sample_rate_null ? 1 : PG_GETARG_INT64(1);
+
+    bool is_explain_analyze_null = PG_ARGISNULL(2);
+	params.explain_analyze = is_explain_analyze_null ? false : PG_GETARG_BOOL(2);
+
+    bool is_explain_dist_null = PG_ARGISNULL(3);
+	params.explain_dist = is_explain_dist_null ? false : PG_GETARG_BOOL(3);
+
+    bool is_explain_debug_null = PG_ARGISNULL(4);
+	params.explain_debug = is_explain_debug_null ? false : PG_GETARG_BOOL(4);
+
+    bool is_bind_var_query_min_duration_ms_null = PG_ARGISNULL(5);
+	params.bind_var_query_min_duration_ms = is_bind_var_query_min_duration_ms_null ? 1 : PG_GETARG_INT64(5);
+
+    bool is_diagnostics_interval_sec_null = PG_ARGISNULL(6);
+	params.diagnostics_interval_sec = is_diagnostics_interval_sec_null ? 300 : PG_GETARG_INT64(6);
+
+    return params;
 }
 
 Datum
 yb_query_diagnostics(PG_FUNCTION_ARGS) //allows geneartion of bundle for a specific query id
 {
-    bool is_queryid_null = PG_ARGISNULL(0);
-	int64 query_id = is_queryid_null ? 0 : PG_GETARG_INT64(0);
-
-    bool is_explain_sample_rate_null = PG_ARGISNULL(1);
-	int64 explain_sample_rate = is_explain_sample_rate_null ? 1 : PG_GETARG_INT64(1);
-
-    bool is_explain_analyze_null = PG_ARGISNULL(2);
-	bool explain_analyze = is_explain_analyze_null ? false : PG_GETARG_BOOL(2);
-
-    bool is_explain_dist_null = PG_ARGISNULL(3);
-	bool explain_dist = is_explain_dist_null ? false : PG_GETARG_BOOL(3);
-
-    bool is_explain_debug_null = PG_ARGISNULL(4);
-	bool explain_debug = is_explain_debug_null ? false : PG_GETARG_BOOL(4);
-
-    bool is_bind_var_query_min_duration_ms_null = PG_ARGISNULL(5);
-	int64 bind_var_query_min_duration_ms = is_bind_var_query_min_duration_ms_null ? 1 : PG_GETARG_INT64(5);
-
-
-    bool is_diagnostics_interval_sec_null = PG_ARGISNULL(6);
-	int64 diagnostics_interval_sec = is_diagnostics_interval_sec_null ? 300 : PG_GETARG_INT64(6);
-
-    if(query_id && bind_var_query_min_duration_ms && explain_sample_rate && diagnostics_interval_sec && explain_analyze && explain_dist && explain_debug)
-    ;
-
-	shared_bundle_variables->isOn = true;
-	shared_bundle_variables->total++;
-
-    QueryDiagnosticsEntry* result = lookup_in_shared_hashtable(query_diagnostics_hash, query_id);
+    QueryDiagnosticsParameters params = fetchParams(fcinfo);
+    QueryDiagnosticsEntry* result = lookup_in_shared_hashtable(query_diagnostics_hash, params.query_id);
+    TimestampTz current_time = GetCurrentTimestamp();
 	if(result){
-		ereport(LOG, (errmsg("Cannot start the bundle for the queryid[ %ld ] as it is already running", query_id)));
-		 PG_RETURN_TEXT_P(cstring_to_text("Cannot start the bundle for the this queryid as it is already running"));
+        if (result->start_time + 20 * 1000 * 1000 < current_time){
+            remove_from_shared_hashtable(query_diagnostics_hash, params.query_id);
+            FILE* fptr = fopen("/Users/ishanchhangani/test.txt","a");
+            fprintf(fptr, "%ld removed from hashtable\n" , params.query_id);
+            fclose(fptr);
+        }
+        else{
+            ereport(LOG, (errmsg("Cannot start the bundle for the queryid[ %ld ] as it is already running", params.query_id)));
+            PG_RETURN_TEXT_P(cstring_to_text("Cannot start the bundle for the this queryid as it is already running"));
+        }
 	}
 
     QueryDiagnosticsEntry entry = {0};
     
-    //set params
-    entry.bind_var_query_min_duration_ms = bind_var_query_min_duration_ms;
-    entry.diagnostics_interval_sec = diagnostics_interval_sec;
-    entry.explain_sample_rate = explain_sample_rate;
-    entry.explain_analyze = explain_analyze;
-    entry.explain_dist = explain_dist;
-    entry.explain_debug = explain_debug;
-    entry.start_time = GetCurrentTimestamp();
+    entry.params = params;
+    entry.start_time = current_time;
 
-    insert_into_shared_hashtable(query_diagnostics_hash, query_id, entry);
-
+    insert_into_shared_hashtable(query_diagnostics_hash, params.query_id, entry);
     PG_RETURN_TEXT_P(cstring_to_text("Give Folder path here!"));
 }

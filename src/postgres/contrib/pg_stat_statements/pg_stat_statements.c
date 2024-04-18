@@ -164,32 +164,6 @@ typedef struct pgssHashKey
 	uint64		queryid;		/* query identifier */
 } pgssHashKey;
 
-/*
- * The actual stats counters kept within pgssEntry.
- */
-// typedef struct Counters
-// {
-// 	int64		calls;			/* # of times executed */
-// 	double		total_time;		/* total execution time, in msec */
-// 	double		min_time;		/* minimum execution time in msec */
-// 	double		max_time;		/* maximum execution time in msec */
-// 	double		mean_time;		/* mean execution time in msec */
-// 	double		sum_var_time;	/* sum of variances in execution time in msec */
-// 	int64		rows;			/* total # of retrieved or affected rows */
-// 	int64		shared_blks_hit;	/* # of shared buffer hits */
-// 	int64		shared_blks_read;	/* # of shared disk blocks read */
-// 	int64		shared_blks_dirtied;	/* # of shared disk blocks dirtied */
-// 	int64		shared_blks_written;	/* # of shared disk blocks written */
-// 	int64		local_blks_hit; /* # of local buffer hits */
-// 	int64		local_blks_read;	/* # of local disk blocks read */
-// 	int64		local_blks_dirtied; /* # of local disk blocks dirtied */
-// 	int64		local_blks_written; /* # of local disk blocks written */
-// 	int64		temp_blks_read; /* # of temp blocks read */
-// 	int64		temp_blks_written;	/* # of temp blocks written */
-// 	double		blk_read_time;	/* time spent reading, in msec */
-// 	double		blk_write_time; /* time spent writing, in msec */
-// 	double		usage;			/* usage factor */
-// } Counters;
 
 /*
  * hdr_histogram
@@ -208,7 +182,7 @@ typedef struct hdr_iter hdr_iter;
 typedef struct pgssEntry
 {
 	pgssHashKey	key;			/* hash key of entry - MUST BE FIRST */
-	Counters	counters;		/* the statistics for this query */
+	YbCounters	counters;		/* the statistics for this query */
 	Size	query_offset;	/* query text offset in external file */
 	int	query_len;		/* # of valid bytes in query string, or -1 */
 	int	encoding;		/* query text encoding */
@@ -423,7 +397,7 @@ static int read_entry_hdr(int header, FILE *file, FILE *qfile,
 static int extended_header_reader(int header, FILE *file,
 	pgssReaderContext *context);
 static int query_buffer_helper(FILE *file, FILE *qfile, int qlen,
-	Size *query_offset, int encoding, Counters *counters,
+	Size *query_offset, int encoding, YbCounters *counters,
 	pgssReaderContext *context);
 static void enforce_bucket_factor(int * value);
 /*
@@ -683,7 +657,7 @@ getYsqlStatementStats(void *cb_arg)
  * text into the query dump file pointed to by qfile.
  */
 static int query_buffer_helper(FILE *file, FILE *qfile, int qlen,
-	Size *query_offset, int encoding, Counters *counters,
+	Size *query_offset, int encoding, YbCounters *counters,
 	pgssReaderContext *context)
 {
 	/* Encoding is the only field we can easily sanity-check */
@@ -725,7 +699,7 @@ static int read_entry_original(int header, FILE *file, FILE *qfile,
 	typedef struct pgssEntry_original
 	{
 		pgssHashKey	key;	/* hash key of entry - MUST BE FIRST */
-		Counters	counters;	/* the statistics for this query */
+		YbCounters	counters;	/* the statistics for this query */
 		Size	query_offset;	/* query text offset in external file */
 		int	query_len;	/* # of valid bytes in query string, or -1 */
 		int	encoding;	/* query text encoding */
@@ -745,7 +719,7 @@ static int read_entry_original(int header, FILE *file, FILE *qfile,
 		int qlen = 0;
 		int encoding = 0;
 		pgssHashKey key;
-		Counters counters;
+		YbCounters counters;
 
 		if (fread(&temp, pgssEntry_size, 1, file) != 1)
 			return -1;
@@ -790,7 +764,7 @@ static int read_entry_hdr(int header, FILE *file, FILE *qfile,
 		int qlen = 0;
 		int encoding = 0;
 		pgssHashKey key;
-		Counters counters;
+		YbCounters counters;
 
 		if (fread(prev_entry, prev_entry_total_size, 1, file) != 1)
 			return -1;
@@ -1960,7 +1934,7 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 		Datum		values[PG_STAT_STATEMENTS_COLS];
 		bool		nulls[PG_STAT_STATEMENTS_COLS];
 		int			i = 0;
-		Counters	tmp;
+		YbCounters	tmp;
 		double		stddev;
 		int64		queryid = entry->key.queryid;
 
@@ -2150,7 +2124,7 @@ entry_alloc(pgssHashKey *key, Size query_offset, int query_len, int encoding,
 		/* New entry, initialize it */
 
 		/* reset the statistics */
-		memset(&entry->counters, 0, sizeof(Counters));
+		memset(&entry->counters, 0, sizeof(YbCounters));
 		/* set the appropriate initial usage count */
 		entry->counters.usage = sticky ? pgss->cur_median_usage : USAGE_INIT;
 		/* re-initialize the mutex each time ... we assume no one using it */

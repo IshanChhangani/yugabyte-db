@@ -1287,7 +1287,7 @@ GRANT pg_read_all_stats TO pg_monitor;
 GRANT pg_stat_scan_tables TO pg_monitor;
 
 CREATE OR REPLACE FUNCTION
-  yb_query_diagnostics (query_id int8, explain_sample_rate int8, explain_analyze bool, explain_dist bool, explain_debug bool, bind_var_query_min_duration_ms int8, diagnostics_interval_sec int8)
+  yb_query_diagnostics (query_id int8, explain_sample_rate int8 DEFAULT 1, explain_analyze bool DEFAULT false, explain_dist bool DEFAULT false, explain_debug bool DEFAULT false, bind_var_query_min_duration_ms int8 DEFAULT 10, diagnostics_interval_sec int8 DEFAULT 300)
 RETURNS text
 LANGUAGE INTERNAL
 STABLE PARALLEL SAFE

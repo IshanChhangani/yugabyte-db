@@ -11,7 +11,16 @@
 
 extern void YbQueryDiagnosticsInstallHooks(void);
 
-
+typedef struct QueryDiagnosticsParameters
+{
+	int64 query_id;
+	int64 bind_var_query_min_duration_ms;
+	int64 diagnostics_interval_sec;
+	int64 explain_sample_rate;
+	bool explain_analyze;
+	bool explain_dist;
+	bool explain_debug;
+} QueryDiagnosticsParameters;
 typedef struct Counters
 {
 	int64		calls;			/* # of times executed */
@@ -34,25 +43,12 @@ typedef struct Counters
 	double		blk_read_time;	/* time spent reading, in msec */
 	double		blk_write_time; /* time spent writing, in msec */
 	double		usage;			/* usage factor */
-} Counters;
+} YbCounters;
 
-
-typedef struct
-{
-    bool isOn;
-	int total;
-} SharedBundleVariables;
 
 typedef struct QueryDiagnosticsEntry
 {
-	//params.
-	int64	   bind_var_query_min_duration_ms;
-	int64	   diagnostics_interval_sec;
-	int64	   explain_sample_rate;
-	bool 	   explain_analyze;
-	bool 	   explain_dist;
-	bool 	   explain_debug;
-
+	QueryDiagnosticsParameters params;
 
 	char       query[2024];
 	TimestampTz start_time;
@@ -69,14 +65,13 @@ typedef struct QueryDiagnosticsEntry
 	Oid			userid;			/* user OID */
 	Oid			dbid;			/* database OID */
 	uint64		queryid;		/* query identifier */
-	Counters    counters;		/* statistics counters */
+	YbCounters    counters;		/* statistics counters */
 	size_t yb_slow_executions; /* # of executions >= yb_hdr_max_value * yb_hdr_latency_res_ms */
 	hdr_histogram yb_hdr_histogram; /* flexible array member at end - MUST BE LAST */
 } QueryDiagnosticsEntry;
 
 
 extern HTAB *query_diagnostics_hash;
-extern SharedBundleVariables *shared_bundle_variables;
 extern Size YbQueryDiagnosticsShmemSize(void);
 extern void YbQueryDiagnosticsShmemInit(void);
 typedef struct {
