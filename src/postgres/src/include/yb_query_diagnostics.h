@@ -10,9 +10,6 @@
 
 
 extern void YbQueryDiagnosticsInstallHooks(void);
-extern bool yb_enable_query_diagnostics_check_hook(bool *newval,
-									 void **extra,
-									 GucSource source);
 
 
 typedef struct Counters
@@ -67,8 +64,6 @@ typedef struct QueryDiagnosticsEntry
 
 	//for schema
 	char        schema_str[1024];
-	//lock
-	pthread_mutex_t 	mutex1;
 	
 	//for pg_stat_statements
 	Oid			userid;			/* user OID */
