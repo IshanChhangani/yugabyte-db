@@ -1111,13 +1111,13 @@ ExplainOneQuery(Query *query, int cursorOptions,
 		instr_time	planstart,
 					planduration;
 
-		if (*(YbGetCurrentQueryExecutionInfo().no_of_attempts) == 0)
+		if (YbGetNoOfRetries() == 0)
 			INSTR_TIME_SET_CURRENT(planstart);
 
 		/* plan the query */
 		plan = pg_plan_query(query, cursorOptions, params);
 
-		if (*(YbGetCurrentQueryExecutionInfo().no_of_attempts) == 0) {
+		if (YbGetNoOfRetries() == 0) {
 			INSTR_TIME_SET_CURRENT(planduration);
 			INSTR_TIME_SUBTRACT(planduration, planstart);
 			YbSetPlanTime(planduration);

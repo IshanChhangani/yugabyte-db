@@ -4752,11 +4752,11 @@ yb_exec_query_wrapper(MemoryContext exec_context,
 	{
 		if (attempt == 0){
 			YbInitCurrentQueryExecutionInfo();
-			YbSetNoOfRetries(&attempt);
 		}
 
 		yb_exec_query_wrapper_one_attempt(
 			exec_context, restart_data, functor, functor_context, attempt, &retry);
+		YbIncrementNoOfRetries();
 	}
 }
 

@@ -1,28 +1,34 @@
 Parsed test spec with 2 sessions
 
-starting permutation: update_in_s1 pgss_reset update_in_s2 wait5s_s1 c1 c2 pgss_check_update_s1
-step update_in_s1: UPDATE test SET v=20 WHERE k=1;
-step pgss_reset: SELECT pg_stat_statements_reset();
+starting permutation: s1_begin s2_begin s1_update s2_update s1_wait5s c1 c2 s2_pgss_check_update
 pg_stat_statements_reset
 
 
-step update_in_s2: UPDATE test SET v=40 WHERE k=1; <waiting ...>
-step wait5s_s1: SELECT pg_sleep(5); <waiting ...>
-step wait5s_s1: <... completed>
+step s1_begin: BEGIN;
+step s2_begin: BEGIN;
+step s1_update: UPDATE test SET v=20 WHERE k=1;
+step s2_update: UPDATE test SET v=40 WHERE k=1; <waiting ...>
+step s1_wait5s: SELECT pg_sleep(5); <waiting ...>
+step s1_wait5s: <... completed>
 pg_sleep
 
 
 step c1: COMMIT;
-step update_in_s2: <... completed>
+step s2_update: <... completed>
 step c2: COMMIT;
-step pgss_check_update_s1:
-    SELECT rows FROM pg_stat_statements WHERE query LIKE '%UPDATE test%' and mean_time > 5000;
+step s2_pgss_check_update:
+    SELECT calls, rows, query FROM pg_stat_statements WHERE query LIKE '%UPDATE test%' and mean_time > 5000;
 
-rows
+calls          rows           query
 
-1
+2              2              UPDATE test SET v=$1 WHERE k=$2
 
-starting permutation: create_function update_in_s1 explain_analyze_check_exec_time_s2 wait5s_s1 c1 c2
+starting permutation: s1_begin s2_begin create_function s1_update s2_explain_analyze_check_exec_time s1_wait5s c1 c2
+pg_stat_statements_reset
+
+
+step s1_begin: BEGIN;
+step s2_begin: BEGIN;
 step create_function:
     CREATE OR REPLACE FUNCTION get_execution_time() RETURNS FLOAT
     AS $$
@@ -36,23 +42,28 @@ step create_function:
     END;
     $$  LANGUAGE plpgsql;
 
-step update_in_s1: UPDATE test SET v=20 WHERE k=1;
-step explain_analyze_check_exec_time_s2:
+step s1_update: UPDATE test SET v=20 WHERE k=1;
+step s2_explain_analyze_check_exec_time:
     select count(*) from (select get_execution_time() as exec_time) as func where exec_time > 5000;
  <waiting ...>
-step wait5s_s1: SELECT pg_sleep(5); <waiting ...>
-step wait5s_s1: <... completed>
+step s1_wait5s: SELECT pg_sleep(5); <waiting ...>
+step s1_wait5s: <... completed>
 pg_sleep
 
 
 step c1: COMMIT;
-step explain_analyze_check_exec_time_s2: <... completed>
+step s2_explain_analyze_check_exec_time: <... completed>
 count
 
 1
 step c2: COMMIT;
 
-starting permutation: create_function update_in_s1 pgss_reset explain_analyze_s2 wait5s_s1 c1 c2 pgss_check_explain_analyze_s1
+starting permutation: s1_begin s2_begin create_function s1_update s2_explain_analyze s1_wait5s c1 c2 s2_pgss_check_explain_analyze
+pg_stat_statements_reset
+
+
+step s1_begin: BEGIN;
+step s2_begin: BEGIN;
 step create_function:
     CREATE OR REPLACE FUNCTION get_execution_time() RETURNS FLOAT
     AS $$
@@ -66,28 +77,24 @@ step create_function:
     END;
     $$  LANGUAGE plpgsql;
 
-step update_in_s1: UPDATE test SET v=20 WHERE k=1;
-step pgss_reset: SELECT pg_stat_statements_reset();
-pg_stat_statements_reset
-
-
-step explain_analyze_s2:
+step s1_update: UPDATE test SET v=20 WHERE k=1;
+step s2_explain_analyze:
     select count(*) from (select get_execution_time() as exec_time) as func;
  <waiting ...>
-step wait5s_s1: SELECT pg_sleep(5); <waiting ...>
-step wait5s_s1: <... completed>
+step s1_wait5s: SELECT pg_sleep(5); <waiting ...>
+step s1_wait5s: <... completed>
 pg_sleep
 
 
 step c1: COMMIT;
-step explain_analyze_s2: <... completed>
+step s2_explain_analyze: <... completed>
 count
 
 1
 step c2: COMMIT;
-step pgss_check_explain_analyze_s1:
-    SELECT rows FROM pg_stat_statements WHERE query LIKE '%get_execution_time%' and mean_time > 5000;
+step s2_pgss_check_explain_analyze:
+    SELECT calls, rows, query FROM pg_stat_statements WHERE query LIKE '%get_execution_time%' and mean_time > 5000;
 
-rows
+calls          rows           query
 
-1
+1              1              select count(*) from (select get_execution_time() as exec_time) as func

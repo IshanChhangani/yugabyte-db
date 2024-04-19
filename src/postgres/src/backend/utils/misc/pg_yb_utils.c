@@ -845,48 +845,64 @@ void YbInitCurrentQueryExecutionInfo()
 	instr_time nulltime;
 	INSTR_TIME_SET_ZERO(nulltime);
 	yb_session_stats.current_query_execution_info = (CurrentQueryExecutionInfo){
-		.no_of_attempts = NULL,
+		.no_of_retries = 0,
 		.plan_time = nulltime,
 		.backoff_time_ms = 0,
 		.retry_execution_time_ms = 0,
 	};
 }
 
-void YbSetNoOfRetries(int *attempt){
-	yb_session_stats.current_query_execution_info.no_of_attempts = attempt;
-}
 
-CurrentQueryExecutionInfo YbGetCurrentQueryExecutionInfo()
+CurrentQueryExecutionInfo 
+YbGetCurrentQueryExecutionInfo()
 {
 	return yb_session_stats.current_query_execution_info;
 }
 
-void YbSetCurrentQueryExecutionInfo(CurrentQueryExecutionInfo retry_info)
+void 
+YbIncrementNoOfRetries()
 {
-	yb_session_stats.current_query_execution_info = retry_info;
+	yb_session_stats.current_query_execution_info.no_of_retries++;
 }
 
-instr_time YbGetPlanTime()
+int 
+YbGetNoOfRetries()
+{
+	return yb_session_stats.current_query_execution_info.no_of_retries;
+}
+
+instr_time 
+YbGetPlanTime()
 {
 	return yb_session_stats.current_query_execution_info.plan_time;
 }
 
-void YbSetPlanTime(instr_time plan_time)
+void 
+YbSetPlanTime(instr_time plan_time)
 {
 	yb_session_stats.current_query_execution_info.plan_time = plan_time;
 }
 
-void YbIncrementBackoffTime(double backoff_time)
+void 
+YbIncrementBackoffTime(double backoff_time)
 {
     yb_session_stats.current_query_execution_info.backoff_time_ms += backoff_time;
 }
 
-void YbIncrementRetryExecutionTime(double retry_execution_time)
+void 
+YbIncrementRetryExecutionTime(double retry_execution_time)
 {
     yb_session_stats.current_query_execution_info.retry_execution_time_ms += retry_execution_time;
 }
 
-double YbGetTotalTime(double successful_attempt_time) //returns total time in ms
+/*
+ * retry_execution_time => Cumulative time spent exclusively during retry attempts. 
+ * It accumulates only when a retry is triggered due to a failed operation or transaction
+ * backoff_time => Wait time before we start another execution. It represents the interval between retries.
+ * successful_attempt_time => Time taken in the successful try.
+ */
+double 
+YbGetTotalTime(double successful_attempt_time) 
 {
 	return yb_session_stats.current_query_execution_info.retry_execution_time_ms + 
 		   yb_session_stats.current_query_execution_info.backoff_time_ms + 
@@ -2265,7 +2281,7 @@ void YBEndOperationsBufferingWithInstr(QueryDesc* queryDesc) {
  */
 	if (buffering_nesting_level && !--buffering_nesting_level) {
 		YBCStatus status = YBCPgStopOperationsBuffering();
-		if (queryDesc && status != NULL) { //in case of retry
+		if (status != NULL && queryDesc) { //in case of retry
 			instr_time endtime;
 			INSTR_TIME_SET_CURRENT(endtime);
 			INSTR_TIME_SUBTRACT(endtime, queryDesc->totaltime->starttime);

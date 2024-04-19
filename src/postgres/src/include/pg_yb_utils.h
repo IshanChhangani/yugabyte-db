@@ -706,7 +706,7 @@ typedef struct YbDdlModeOptional
 } YbDdlModeOptional;
 
 typedef struct YbRetryInfo {
-	int				   	*no_of_attempts;
+	int				   	no_of_retries;
 	instr_time			plan_time;	
 	double 				retry_execution_time_ms;
 	double 				backoff_time_ms;
@@ -1127,10 +1127,10 @@ extern void YbInitCurrentQueryExecutionInfo();
 extern CurrentQueryExecutionInfo YbGetCurrentQueryExecutionInfo();
 extern void YbSetCurrentQueryExecutionInfo(CurrentQueryExecutionInfo retry_info);
 extern instr_time YbGetPlanTime();
-extern void YbSetNoOfRetries(int* attempt);
+extern void YbIncrementNoOfRetries();
+extern int YbGetNoOfRetries();
 extern void YbIncrementBackoffTime(double backoff_time);
 extern void YbIncrementRetryExecutionTime(double retry_execution_time);
 extern void YbSetPlanTime(instr_time plan_time);
 extern double YbGetTotalTime(double successful_attempt_time);
-
 #endif /* PG_YB_UTILS_H */
