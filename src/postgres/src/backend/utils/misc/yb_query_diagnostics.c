@@ -246,8 +246,6 @@ queryDiagnostics_ExecutorEnd(QueryDesc *queryDesc)
         fclose(fptr);
     }
 
-
-
     // QueryDiagnosticsEntry* queryDiagnosticsEntry = lookup_in_shared_hashtable(query_diagnostics_hash, queryDesc->plannedstmt->queryId);
     // if(queryDiagnosticsEntry)
     //     print_schema_details(queryDesc->plannedstmt->rtable, queryDiagnosticsEntry);
