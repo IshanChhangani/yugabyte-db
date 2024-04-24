@@ -1,9 +1,11 @@
 #include "postgres.h"
+#include <unistd.h>
 #include "yb_query_diagnostics.h"
 #include "access/htup_details.h"
 #include "catalog/indexing.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_constraint_d.h"
+#include "commands/explain.h"
 #include "commands/tablespace.h"
 #include "executor/execdebug.h"
 #include "executor/instrument.h"
@@ -12,7 +14,9 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/ruleutils.h"
+#include "utils/timeout.h"
 #include "utils/timestamp.h"
+#include <time.h>
 
 PG_MODULE_MAGIC;
 
@@ -180,6 +184,55 @@ queryDiagnostics_ExecutorFinish(QueryDesc *queryDesc)
 static void 
 queryDiagnostics_ExecutorEnd(QueryDesc *queryDesc)
 {
+
+    ExplainState *es = NewExplainState();
+    bool auto_explain_log_analyze = true;
+    bool auto_explain_log_verbose = true;
+    bool auto_explain_log_buffers = false;
+    bool auto_explain_log_timing = true;
+    int auto_explain_log_format = EXPLAIN_FORMAT_TEXT;
+    bool auto_explain_log_dist = true;
+    bool auto_explain_log_triggers = false;
+    es->analyze = (queryDesc->instrument_options && auto_explain_log_analyze);
+    es->verbose = auto_explain_log_verbose;
+    es->buffers = (es->analyze && auto_explain_log_buffers);
+    es->timing = (es->analyze && auto_explain_log_timing);
+    es->summary = es->analyze;
+    es->format = auto_explain_log_format;
+    es->rpc = (es->analyze && auto_explain_log_dist);
+
+    ExplainBeginOutput(es);
+    ExplainQueryText(es, queryDesc);
+    ExplainPrintPlan(es, queryDesc);
+    if (es->analyze && auto_explain_log_triggers)
+        ExplainPrintTriggers(es, queryDesc);
+    if (es->costs)
+        ExplainPrintJITSummary(es, queryDesc);
+    ExplainEndOutput(es);
+
+    /* Remove last line break */
+    if (es->str->len > 0 && es->str->data[es->str->len - 1] == '\n')
+        es->str->data[--es->str->len] = '\0';
+
+    /* Fix JSON to output an object */
+    if (auto_explain_log_format == EXPLAIN_FORMAT_JSON)
+    {
+        es->str->data[0] = '{';
+        es->str->data[es->str->len - 1] = '}';
+    }
+
+
+    // /*
+    //     * Note: we rely on the existing logging of context or
+    //     * debug_query_string to identify just which statement is being
+    //     * reported.  This isn't ideal but trying to do it here would
+    //     * often result in duplication.
+    //     */
+    FILE* fptr = fopen("/Users/ishanchhangani/test.txt","a");
+    fprintf(fptr, "duration: %.3f ms plan:\n%s" , 10.0, es->str->data);
+    fclose(fptr);
+
+
     if (prev_ExecutorEnd)
         prev_ExecutorEnd(queryDesc);
     else
@@ -192,6 +245,8 @@ queryDiagnostics_ExecutorEnd(QueryDesc *queryDesc)
         fprintf(fptr, "PARAMS: %s\n", format_params(queryDesc->params));
         fclose(fptr);
     }
+
+
 
     // QueryDiagnosticsEntry* queryDiagnosticsEntry = lookup_in_shared_hashtable(query_diagnostics_hash, queryDesc->plannedstmt->queryId);
     // if(queryDiagnosticsEntry)
@@ -441,6 +496,13 @@ fetchParams(FunctionCallInfo fcinfo){
 
     return params;
 }
+void my_timeout_handler() {
+    FILE* fptr = fopen("/Users/ishanchhangani/test.txt","a");
+    fprintf(fptr, "Alarm rings\n");
+    fclose(fptr);
+    // remove_from_shared_hashtable(query_diagnostics_hash, queryid)
+    // how to get the queryid?
+}
 
 Datum
 yb_query_diagnostics(PG_FUNCTION_ARGS) //allows geneartion of bundle for a specific query id
@@ -467,5 +529,13 @@ yb_query_diagnostics(PG_FUNCTION_ARGS) //allows geneartion of bundle for a speci
     entry.start_time = current_time;
 
     insert_into_shared_hashtable(query_diagnostics_hash, params.query_id, entry);
+
+    // Register a new timeout with a callback function
+    TimeoutId myTimeoutId = RegisterTimeout(USER_TIMEOUT, my_timeout_handler);
+
+    // Enable the timeout to expire 10 seconds from now
+    enable_timeout_after(myTimeoutId, 5000);
+    
+
     PG_RETURN_TEXT_P(cstring_to_text("Give Folder path here!"));
 }
