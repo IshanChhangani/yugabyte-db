@@ -598,8 +598,8 @@ void YBCRestorePgSessionState(const YbcPgSessionState* session_data) {
   pgapi->RestoreSessionState(*session_data);
 }
 
-void YBCPgIncrementIndexRecheckCount() {
-  pgapi->IncrementIndexRecheckCount();
+void YBCPgIncrementIndexRecheckCount(bool is_catalog) {
+  pgapi->IncrementIndexRecheckCount(is_catalog);
 }
 
 uint64_t YBCPgGetSessionID() { return pgapi->GetSessionID(); }

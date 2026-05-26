@@ -1842,8 +1842,8 @@ Status PgApiImpl::ExecSelect(PgStatement* handle, const YbcPgExecParameters* exe
   return select.Exec(exec_params);
 }
 
-void PgApiImpl::IncrementIndexRecheckCount() {
-  pg_session_->metrics().RecordRowRemovedByIndexRecheck();
+void PgApiImpl::IncrementIndexRecheckCount(bool is_catalog) {
+  pg_session_->metrics().RecordRowRemovedByIndexRecheck(is_catalog);
 }
 
 

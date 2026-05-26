@@ -635,7 +635,7 @@ class PgApiImpl {
 
   Status DmlHnswSetReadOptions(PgStatement *handle, int ef_search);
 
-  void IncrementIndexRecheckCount();
+  void IncrementIndexRecheckCount(bool is_catalog);
 
   //------------------------------------------------------------------------------------------------
   // Functions.

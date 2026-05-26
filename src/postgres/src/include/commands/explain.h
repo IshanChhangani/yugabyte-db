@@ -47,6 +47,8 @@ typedef struct YbExplainExecStats
 	double		write_count;
 	double		catalog_write_count;
 
+	double		catalog_rows_removed_by_recheck;
+
 	YbcPgExecStorageMetrics *read_metrics;
 	YbcPgExecStorageMetrics *write_metrics;
 } YbExplainExecStats;

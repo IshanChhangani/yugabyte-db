@@ -513,6 +513,7 @@ typedef struct {
   YbcPgExecStorageMetrics write_metrics;
 
   uint64_t rows_removed_by_recheck;
+  uint64_t catalog_rows_removed_by_recheck;
   uint64_t commit_wait;
 } YbcPgExecStats;
 

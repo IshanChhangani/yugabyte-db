@@ -42,7 +42,7 @@ class PgDocMetrics {
   void RecordRequestMetrics(const LWPgsqlRequestMetricsPB& metrics, bool is_read);
   void RecordStorageRowsRead(TableType relation, uint64_t row);
   void RecordStorageRowsReceived(TableType relation, uint64_t row);
-  void RecordRowRemovedByIndexRecheck();
+  void RecordRowRemovedByIndexRecheck(bool is_catalog);
 
   // A helper function to compute the wait time of a function
   template <class Functor>

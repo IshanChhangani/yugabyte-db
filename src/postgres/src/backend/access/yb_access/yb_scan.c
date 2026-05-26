@@ -4121,7 +4121,7 @@ ybc_getnext_heaptuple(YbScanDesc ybScan, ScanDirection dir)
 		 */
 		if (ybRecheck(tup, ybScan))
 		{
-			YBCPgIncrementIndexRecheckCount();
+			YBCPgIncrementIndexRecheckCount(IsCatalogRelation(ybScan->table));
 			heap_freetuple(tup);
 			continue;
 		}

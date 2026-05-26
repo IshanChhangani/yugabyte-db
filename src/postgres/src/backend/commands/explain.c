@@ -2965,8 +2965,12 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			show_scan_qual(((IndexScan *) plan)->indexqualorig,
 						   "Index Cond", planstate, ancestors, es);
 			if (((IndexScan *) plan)->indexqualorig)
+			{
 				show_instrumentation_count("Rows Removed by Index Recheck", 2,
 										   planstate, es);
+				show_instrumentation_count("Catalog Rows Removed by Index Recheck", 2,
+										   planstate, es);
+			}
 			YbExplainMergeScan(planstate,
 							   ((IndexScan *) plan)->indextlist,
 							   ((IndexScan *) plan)->yb_merge_scan_info,
@@ -3003,8 +3007,12 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			show_scan_qual(((IndexOnlyScan *) plan)->indexqual,
 						   "Index Cond", planstate, ancestors, es);
 			if (((IndexOnlyScan *) plan)->recheckqual)
+			{
 				show_instrumentation_count("Rows Removed by Index Recheck", 2,
 										   planstate, es);
+				show_instrumentation_count("Catalog Rows Removed by Index Recheck", 2,
+										   planstate, es);
+			}
 			YbExplainMergeScan(planstate,
 							   ((IndexOnlyScan *) plan)->indextlist,
 							   ((IndexOnlyScan *) plan)->yb_merge_scan_info,
@@ -3056,8 +3064,12 @@ ExplainNode(PlanState *planstate, List *ancestors,
 			show_scan_qual(((BitmapHeapScan *) plan)->bitmapqualorig,
 						   "Recheck Cond", planstate, ancestors, es);
 			if (((BitmapHeapScan *) plan)->bitmapqualorig)
+			{
 				show_instrumentation_count("Rows Removed by Index Recheck", 2,
 										   planstate, es);
+				show_instrumentation_count("Catalog Rows Removed by Index Recheck", 2,
+										   planstate, es);
+			}
 			show_scan_qual(plan->qual, "Filter", planstate, ancestors, es);
 			if (plan->qual)
 				show_instrumentation_count("Rows Removed by Filter", 1,
@@ -3093,8 +3105,12 @@ ExplainNode(PlanState *planstate, List *ancestors,
 					show_scan_qual(bitmapplan->recheck_local_quals, "Recheck Cond",
 								   planstate, ancestors, es);
 					if (bitmapplan->recheck_local_quals)
-						show_instrumentation_count("Rows Removed by Index Recheck",
-												   2, planstate, es);
+					{
+						show_instrumentation_count("Rows Removed by Index Recheck", 2,
+												planstate, es);
+						show_instrumentation_count("Catalog Rows Removed by Index Recheck", 2,
+												planstate, es);
+					}
 				}
 
 				show_scan_qual(local_filter, "Filter", planstate, ancestors, es);
@@ -4866,7 +4882,10 @@ show_instrumentation_count(const char *qlabel, int which,
 	{
 		YbInstrumentation *yb_instr = &planstate->instrument->yb_instr;
 
-		nfiltered += yb_instr->rows_removed_by_recheck;
+		if (strcmp(qlabel, "Rows Removed by Index Recheck") == 0)
+			nfiltered += yb_instr->rows_removed_by_recheck;
+		else
+			nfiltered += yb_instr->catalog_rows_removed_by_recheck;
 	}
 
 	/* In text mode, suppress zero counts; they're not interesting enough */

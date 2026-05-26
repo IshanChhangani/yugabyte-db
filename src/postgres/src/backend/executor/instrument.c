@@ -242,6 +242,7 @@ InstrAggNode(Instrumentation *dst, Instrumentation *add)
 	YbInstrAggRpcMetrics(&dst->yb_instr.write_metrics, &add->yb_instr.write_metrics);
 
 	dst->yb_instr.rows_removed_by_recheck += add->yb_instr.rows_removed_by_recheck;
+	dst->yb_instr.catalog_rows_removed_by_recheck += add->yb_instr.catalog_rows_removed_by_recheck;
 }
 
 /* note current values during parallel executor startup */

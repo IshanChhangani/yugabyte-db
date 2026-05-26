@@ -7066,6 +7066,7 @@ aggregateStats(YbInstrumentation *instr, const YbcPgExecStats *exec_stats)
 	aggregateRpcMetrics(&instr->write_metrics, &exec_stats->write_metrics);
 
 	instr->rows_removed_by_recheck += exec_stats->rows_removed_by_recheck;
+	instr->catalog_rows_removed_by_recheck += exec_stats->catalog_rows_removed_by_recheck;
 	instr->commit_wait += exec_stats->commit_wait;
 }
 
@@ -7130,6 +7131,7 @@ calculateExecStatsDiff(const YbSessionStats *stats, YbcPgExecStats *result)
 	calculateStorageMetricsDiff(&result->write_metrics, &current->write_metrics, &old->write_metrics);
 
 	result->rows_removed_by_recheck = current->rows_removed_by_recheck - old->rows_removed_by_recheck;
+	result->catalog_rows_removed_by_recheck = current->catalog_rows_removed_by_recheck - old->catalog_rows_removed_by_recheck;
 	result->commit_wait = current->commit_wait - old->commit_wait;
 }
 
@@ -7146,7 +7148,10 @@ refreshExecStats(YbSessionStats *stats, bool include_catalog_stats)
 	old->flush_wait = current->flush_wait;
 
 	if (include_catalog_stats)
+	{
 		old->catalog = current->catalog;
+		old->catalog_rows_removed_by_recheck = current->catalog_rows_removed_by_recheck;
+	}
 
 	if (yb_session_stats.current_state.metrics_capture)
 	{

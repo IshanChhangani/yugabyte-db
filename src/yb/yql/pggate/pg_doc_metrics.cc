@@ -148,8 +148,11 @@ void PgDocMetrics::RecordStorageRowsReceived(TableType relation, uint64_t rows) 
   IncRowsReceived(&GetStat(&state_, relation), rows);
 }
 
-void PgDocMetrics::RecordRowRemovedByIndexRecheck() {
-  state_.stats.rows_removed_by_recheck += 1;
+void PgDocMetrics::RecordRowRemovedByIndexRecheck(bool is_catalog) {
+  if (is_catalog)
+    state_.stats.catalog_rows_removed_by_recheck += 1;
+  else
+    state_.stats.rows_removed_by_recheck += 1;
 }
 
 }  // namespace yb::pggate

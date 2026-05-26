@@ -61,7 +61,7 @@ void YBCDumpCurrentPgSessionState(YbcPgSessionState* session_data);
 
 void YBCRestorePgSessionState(const YbcPgSessionState* session_data);
 
-void YBCPgIncrementIndexRecheckCount();
+void YBCPgIncrementIndexRecheckCount(bool is_catalog);
 
 uint64_t YBCPgGetSessionID();
 
