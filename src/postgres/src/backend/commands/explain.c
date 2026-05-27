@@ -4883,9 +4883,29 @@ show_instrumentation_count(const char *qlabel, int which,
 		YbInstrumentation *yb_instr = &planstate->instrument->yb_instr;
 
 		if (strcmp(qlabel, "Rows Removed by Index Recheck") == 0)
+		{
+			{
+				FILE *f = fopen("/Users/ishanchhangani/code/manual_logs.log", "a");
+				if (f) {
+					fprintf(f, "[explain] label='%s', nfiltered2=%.0f, yb_regular_recheck=%lu\n",
+							qlabel, nfiltered, (unsigned long) yb_instr->rows_removed_by_recheck);
+					fclose(f);
+				}
+			}
 			nfiltered += yb_instr->rows_removed_by_recheck;
+		}
 		else
+		{
+			{
+				FILE *f = fopen("/Users/ishanchhangani/code/manual_logs.log", "a");
+				if (f) {
+					fprintf(f, "[explain] label='%s', nfiltered2=%.0f, yb_catalog_recheck=%lu\n",
+							qlabel, nfiltered, (unsigned long) yb_instr->catalog_rows_removed_by_recheck);
+					fclose(f);
+				}
+			}
 			nfiltered += yb_instr->catalog_rows_removed_by_recheck;
+		}
 	}
 
 	/* In text mode, suppress zero counts; they're not interesting enough */

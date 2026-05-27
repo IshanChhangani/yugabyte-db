@@ -4121,7 +4121,16 @@ ybc_getnext_heaptuple(YbScanDesc ybScan, ScanDirection dir)
 		 */
 		if (ybRecheck(tup, ybScan))
 		{
-			YBCPgIncrementIndexRecheckCount(IsCatalogRelation(ybScan->table));
+			bool is_catalog = IsCatalogRelation(ybScan->table);
+			{
+				FILE *f = fopen("/Users/ishanchhangani/code/manual_logs.log", "a");
+				if (f) {
+					fprintf(f, "[yb_scan] YB recheck filtered a row: is_catalog=%d, table oid=%u\n",
+							is_catalog, RelationGetRelid(ybScan->table));
+					fclose(f);
+				}
+			}
+			YBCPgIncrementIndexRecheckCount(is_catalog);
 			heap_freetuple(tup);
 			continue;
 		}

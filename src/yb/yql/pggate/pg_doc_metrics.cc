@@ -15,6 +15,8 @@
 
 #include "yb/yql/pggate/pg_doc_metrics.h"
 
+#include <cstdio>
+
 #include "yb/util/flags.h"
 
 namespace yb::pggate {
@@ -149,10 +151,20 @@ void PgDocMetrics::RecordStorageRowsReceived(TableType relation, uint64_t rows) 
 }
 
 void PgDocMetrics::RecordRowRemovedByIndexRecheck(bool is_catalog) {
-  if (is_catalog)
+  if (is_catalog) {
     state_.stats.catalog_rows_removed_by_recheck += 1;
-  else
+  } else {
     state_.stats.rows_removed_by_recheck += 1;
+  }
+  FILE *f = fopen("/Users/ishanchhangani/code/manual_logs.log", "a");
+  if (f) {
+    fprintf(f, "[pg_doc_metrics] RecordRowRemovedByIndexRecheck: is_catalog=%d, "
+            "regular_total=%lu, catalog_total=%lu\n",
+            is_catalog,
+            (unsigned long) state_.stats.rows_removed_by_recheck,
+            (unsigned long) state_.stats.catalog_rows_removed_by_recheck);
+    fclose(f);
+  }
 }
 
 }  // namespace yb::pggate

@@ -250,6 +250,13 @@ IndexNext(IndexScanState *node)
 			{
 				ResetExprContext(econtext);
 				/* Fails recheck, so drop it and loop back for another */
+				{
+					FILE *f = fopen("/Users/ishanchhangani/code/manual_logs.log", "a");
+					if (f) {
+						fprintf(f, "[nodeIndexscan] PG recheck (xs_recheck) filtered a row, incrementing nfiltered2\n");
+						fclose(f);
+					}
+				}
 				InstrCountFiltered2(node, 1);
 				continue;
 			}

@@ -7067,6 +7067,18 @@ aggregateStats(YbInstrumentation *instr, const YbcPgExecStats *exec_stats)
 
 	instr->rows_removed_by_recheck += exec_stats->rows_removed_by_recheck;
 	instr->catalog_rows_removed_by_recheck += exec_stats->catalog_rows_removed_by_recheck;
+	{
+		FILE *f = fopen("/Users/ishanchhangani/code/manual_logs.log", "a");
+		if (f) {
+			fprintf(f, "[pg_yb_utils] aggregateStats: exec_stats regular_recheck=%lu, catalog_recheck=%lu; "
+					"instr totals regular_recheck=%lu, catalog_recheck=%lu\n",
+					(unsigned long) exec_stats->rows_removed_by_recheck,
+					(unsigned long) exec_stats->catalog_rows_removed_by_recheck,
+					(unsigned long) instr->rows_removed_by_recheck,
+					(unsigned long) instr->catalog_rows_removed_by_recheck);
+			fclose(f);
+		}
+	}
 	instr->commit_wait += exec_stats->commit_wait;
 }
 
