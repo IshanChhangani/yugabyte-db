@@ -1,0 +1,201 @@
+diff --git a/src/postgres/src/backend/access/yb_access/yb_scan.c b/src/postgres/src/backend/access/yb_access/yb_scan.c
+index 9879acf644..1a501eae3c 100644
+--- a/src/postgres/src/backend/access/yb_access/yb_scan.c
++++ b/src/postgres/src/backend/access/yb_access/yb_scan.c
+@@ -3521,7 +3521,7 @@ ybc_getnext_heaptuple(YbScanDesc ybScan, ScanDirection dir, bool *recheck)
+ 		 */
+ 		if (ybRecheck(tup, ybScan))
+ 		{
+-			YBCPgIncrementIndexRecheckCount();
++			YBCPgIncrementIndexRecheckCount(IsSystemRelation(ybScan->rs_base.rs_rd));
+ 			heap_freetuple(tup);
+ 			continue;
+ 		}
+diff --git a/src/postgres/src/backend/commands/explain.c b/src/postgres/src/backend/commands/explain.c
+index f56a60cfbc..a1a472a1c5 100644
+--- a/src/postgres/src/backend/commands/explain.c
++++ b/src/postgres/src/backend/commands/explain.c
+@@ -1768,6 +1768,9 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
+ 									   es->yb_stats.catalog_read_op_count);
+ 			YbExplainStatWithoutTiming(&yb_es, YB_STAT_LABEL_CATALOG_WRITE,
+ 									   es->yb_stats.catalog_write_count);
++			if (es->yb_stats.catalog_rows_removed_by_recheck > 0)
++				ExplainPropertyFloat("Catalog Rows Removed by Recheck", NULL,
++									 es->yb_stats.catalog_rows_removed_by_recheck, 0, es);
+ 			YbExplainStatWithoutTiming(&yb_es, YB_STAT_LABEL_STORAGE_WRITE,
+ 									   es->yb_stats.write_count);
+ 			YbExplainRpcRequestStat(&yb_es, YB_STAT_LABEL_STORAGE_FLUSH,
+@@ -4861,6 +4864,7 @@ show_instrumentation_count(const char *qlabel, int which,
+ 		YbInstrumentation *yb_instr = &planstate->instrument->yb_instr;
+
+ 		nfiltered += yb_instr->rows_removed_by_recheck;
++		nfiltered += yb_instr->catalog_rows_removed_by_recheck;
+ 	}
+
+ 	/* In text mode, suppress zero counts; they're not interesting enough */
+@@ -6642,6 +6646,9 @@ YbAggregateExplainableRPCRequestStat(ExplainState *es,
+ 	/* Catalog Writes */
+ 	es->yb_stats.catalog_write_count += yb_instr->catalog_writes;
+
++	/* Catalog Rows Removed by Recheck */
++	es->yb_stats.catalog_rows_removed_by_recheck += yb_instr->catalog_rows_removed_by_recheck;
++
+ 	/* Storage Flushes */
+ 	es->yb_stats.flush.count += yb_instr->write_flushes.count;
+ 	es->yb_stats.flush.wait_time += yb_instr->write_flushes.wait_time;
+diff --git a/src/postgres/src/backend/utils/misc/pg_yb_utils.c b/src/postgres/src/backend/utils/misc/pg_yb_utils.c
+index 18135e4a2d..48ecd4d553 100644
+--- a/src/postgres/src/backend/utils/misc/pg_yb_utils.c
++++ b/src/postgres/src/backend/utils/misc/pg_yb_utils.c
+@@ -7171,6 +7171,7 @@ aggregateStats(YbInstrumentation *instr, const YbcPgExecStats *exec_stats)
+ 	aggregateRpcMetrics(&instr->write_metrics, &exec_stats->write_metrics);
+
+ 	instr->rows_removed_by_recheck += exec_stats->rows_removed_by_recheck;
++	instr->catalog_rows_removed_by_recheck += exec_stats->catalog_rows_removed_by_recheck;
+ 	instr->commit_wait += exec_stats->commit_wait;
+ }
+
+@@ -7235,6 +7236,7 @@ calculateExecStatsDiff(const YbSessionStats *stats, YbcPgExecStats *result)
+ 	calculateStorageMetricsDiff(&result->write_metrics, &current->write_metrics, &old->write_metrics);
+
+ 	result->rows_removed_by_recheck = current->rows_removed_by_recheck - old->rows_removed_by_recheck;
++	result->catalog_rows_removed_by_recheck = current->catalog_rows_removed_by_recheck - old->catalog_rows_removed_by_recheck;
+ 	result->commit_wait = current->commit_wait - old->commit_wait;
+ }
+
+@@ -7251,7 +7253,10 @@ refreshExecStats(YbSessionStats *stats, bool include_catalog_stats)
+ 	old->flush_wait = current->flush_wait;
+
+ 	if (include_catalog_stats)
++	{
+ 		old->catalog = current->catalog;
++		old->catalog_rows_removed_by_recheck = current->catalog_rows_removed_by_recheck;
++	}
+
+ 	if (yb_session_stats.current_state.metrics_capture)
+ 	{
+diff --git a/src/postgres/src/include/commands/explain.h b/src/postgres/src/include/commands/explain.h
+index c394f0b437..82f528dd7e 100644
+--- a/src/postgres/src/include/commands/explain.h
++++ b/src/postgres/src/include/commands/explain.h
+@@ -47,6 +47,8 @@ typedef struct YbExplainExecStats
+ 	double		write_count;
+ 	double		catalog_write_count;
+
++	double		catalog_rows_removed_by_recheck;
++
+ 	YbcPgExecStorageMetrics *read_metrics;
+ 	YbcPgExecStorageMetrics *write_metrics;
+ } YbExplainExecStats;
+diff --git a/src/postgres/src/include/executor/instrument.h b/src/postgres/src/include/executor/instrument.h
+index 59dc241da2..3917a73663 100644
+--- a/src/postgres/src/include/executor/instrument.h
++++ b/src/postgres/src/include/executor/instrument.h
+@@ -94,6 +94,7 @@ typedef struct YbInstrumentation
+ 	YbcPgExecStorageMetrics write_metrics;
+
+ 	uint64_t	rows_removed_by_recheck;
++	uint64_t	catalog_rows_removed_by_recheck;
+ 	uint64_t	commit_wait;
+ } YbInstrumentation;
+
+diff --git a/src/yb/yql/pggate/pg_doc_metrics.cc b/src/yb/yql/pggate/pg_doc_metrics.cc
+index 46fed4c867..97a5838b0c 100644
+--- a/src/yb/yql/pggate/pg_doc_metrics.cc
++++ b/src/yb/yql/pggate/pg_doc_metrics.cc
+@@ -148,8 +148,11 @@ void PgDocMetrics::RecordStorageRowsReceived(TableType relation, uint64_t rows)
+   IncRowsReceived(&GetStat(&state_, relation), rows);
+ }
+
+-void PgDocMetrics::RecordRowRemovedByIndexRecheck() {
+-  state_.stats.rows_removed_by_recheck += 1;
++void PgDocMetrics::RecordRowRemovedByIndexRecheck(bool is_catalog) {
++  if (is_catalog)
++    state_.stats.catalog_rows_removed_by_recheck += 1;
++  else
++    state_.stats.rows_removed_by_recheck += 1;
+ }
+
+ }  // namespace yb::pggate
+diff --git a/src/yb/yql/pggate/pg_doc_metrics.h b/src/yb/yql/pggate/pg_doc_metrics.h
+index 5b89346c65..abb05d3b5b 100644
+--- a/src/yb/yql/pggate/pg_doc_metrics.h
++++ b/src/yb/yql/pggate/pg_doc_metrics.h
+@@ -42,7 +42,7 @@ class PgDocMetrics {
+   void RecordRequestMetrics(const LWPgsqlRequestMetricsPB& metrics, bool is_read);
+   void RecordStorageRowsRead(TableType relation, uint64_t row);
+   void RecordStorageRowsReceived(TableType relation, uint64_t row);
+-  void RecordRowRemovedByIndexRecheck();
++  void RecordRowRemovedByIndexRecheck(bool is_catalog);
+
+   // A helper function to compute the wait time of a function
+   template <class Functor>
+diff --git a/src/yb/yql/pggate/pggate.cc b/src/yb/yql/pggate/pggate.cc
+index c6378c49f0..97c09eca6f 100644
+--- a/src/yb/yql/pggate/pggate.cc
++++ b/src/yb/yql/pggate/pggate.cc
+@@ -1779,8 +1779,8 @@ Status PgApiImpl::ExecSelect(PgStatement* handle, const YbcPgExecParameters* exe
+   return select.Exec(exec_params);
+ }
+
+-void PgApiImpl::IncrementIndexRecheckCount() {
+-  pg_session_->metrics().RecordRowRemovedByIndexRecheck();
++void PgApiImpl::IncrementIndexRecheckCount(bool is_catalog) {
++  pg_session_->metrics().RecordRowRemovedByIndexRecheck(is_catalog);
+ }
+
+
+diff --git a/src/yb/yql/pggate/pggate.h b/src/yb/yql/pggate/pggate.h
+index 07516e203f..fc224e5e96 100644
+--- a/src/yb/yql/pggate/pggate.h
++++ b/src/yb/yql/pggate/pggate.h
+@@ -658,7 +658,7 @@ class PgApiImpl {
+
+   Status DmlHnswSetReadOptions(PgStatement *handle, int ef_search);
+
+-  void IncrementIndexRecheckCount();
++  void IncrementIndexRecheckCount(bool is_catalog);
+
+   //------------------------------------------------------------------------------------------------
+   // Functions.
+diff --git a/src/yb/yql/pggate/ybc_pg_typedefs.h b/src/yb/yql/pggate/ybc_pg_typedefs.h
+index f8f8e0d91c..54aa74f546 100644
+--- a/src/yb/yql/pggate/ybc_pg_typedefs.h
++++ b/src/yb/yql/pggate/ybc_pg_typedefs.h
+@@ -498,6 +498,7 @@ typedef struct {
+   YbcPgExecStorageMetrics write_metrics;
+
+   uint64_t rows_removed_by_recheck;
++  uint64_t catalog_rows_removed_by_recheck;
+   uint64_t commit_wait;
+ } YbcPgExecStats;
+
+diff --git a/src/yb/yql/pggate/ybc_pggate.cc b/src/yb/yql/pggate/ybc_pggate.cc
+index 1c2df5837f..3d7c1d7967 100644
+--- a/src/yb/yql/pggate/ybc_pggate.cc
++++ b/src/yb/yql/pggate/ybc_pggate.cc
+@@ -598,8 +598,8 @@ YbcStatus YBCPgInitSession(YbcPgExecStatsState* session_stats, bool is_binary_up
+   return ToYBCStatus(PgInitSessionImpl(*session_stats, is_binary_upgrade));
+ }
+
+-void YBCPgIncrementIndexRecheckCount() {
+-  pgapi->IncrementIndexRecheckCount();
++void YBCPgIncrementIndexRecheckCount(bool is_catalog) {
++  pgapi->IncrementIndexRecheckCount(is_catalog);
+ }
+
+ uint64_t YBCPgGetSessionID() { return pgapi->GetSessionID(); }
+diff --git a/src/yb/yql/pggate/ybc_pggate.h b/src/yb/yql/pggate/ybc_pggate.h
+index 3c518371c8..cf1f4fa4ce 100644
+--- a/src/yb/yql/pggate/ybc_pggate.h
++++ b/src/yb/yql/pggate/ybc_pggate.h
+@@ -60,7 +60,7 @@ void YBCRestorePgSessionState(const YbcPgSessionState* session_data);
+
+ YbcStatus YBCPgInitSession(YbcPgExecStatsState* session_stats, bool is_binary_upgrade);
+
+-void YBCPgIncrementIndexRecheckCount();
++void YBCPgIncrementIndexRecheckCount(bool is_catalog);
+
+ uint64_t YBCPgGetSessionID();
+
+
